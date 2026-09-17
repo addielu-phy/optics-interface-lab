@@ -192,9 +192,14 @@ function render(nextState, model, { announce = true } = {}) {
   dom.incidentAngleLabel.setAttribute('y', fixed(incidentLabelPoint.y, 2));
   dom.incidentAngleLabel.textContent = `θ₁ ${fixed(nextState.angle)}°`;
 
-  const reflectOpacity = Math.max(.24, model.reflectance);
-  dom.reflectedRay.style.opacity = String(reflectOpacity);
-  dom.reflectedGlow.style.opacity = String(reflectOpacity * .22);
+  const showReflection = model.reflectance > 1e-10;
+  dom.reflectedRay.toggleAttribute('hidden', !showReflection);
+  dom.reflectedGlow.toggleAttribute('hidden', !showReflection);
+  if (showReflection) {
+    const reflectOpacity = Math.max(.24, model.reflectance);
+    dom.reflectedRay.style.opacity = String(reflectOpacity);
+    dom.reflectedGlow.style.opacity = String(reflectOpacity * .22);
+  }
 
   if (model.totalInternalReflection) {
     dom.transmittedRay.toggleAttribute('hidden', true);

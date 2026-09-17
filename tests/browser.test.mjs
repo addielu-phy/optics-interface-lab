@@ -261,6 +261,14 @@ async function runInteractions(page) {
   assert.equal(straw.n2, 1.333);
   assert.equal(straw.totalInternalReflection, false);
 
+  await page.locator('#incident-medium').selectOption('glass');
+  await page.locator('#transmitted-medium').selectOption('glass');
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setAngle(30)), true);
+  const equalMedia = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
+  assert.equal(equalMedia.reflectance, 0);
+  assert.equal(await page.locator('#reflected-ray').getAttribute('hidden'), '', 'zero-energy reflected ray must be hidden');
+  assert.equal(await page.locator('#reflected-ray-glow').getAttribute('hidden'), '', 'zero-energy reflected glow must be hidden');
+
   await page.locator('[data-preset="fiber"]').click();
   const fiber = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
   assert.equal(fiber.n1, 1.5);
