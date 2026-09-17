@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f0e8">
+  <meta name="description" content="可拖曳光源、自由選擇介質，探索斯涅耳定律、折射、臨界角與全反射。">
+  <link rel="canonical" href="https://addielu-phy.github.io/optics-interface-lab/">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>光的界面實驗室｜折射與全反射</title>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要內容</a>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="回到頁首">
+      <span class="brand-mark" aria-hidden="true">↘</span>
+      <span>光的界面實驗室</span>
+    </a>
+    <span class="course-tag">高中物理 · 幾何光學</span>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="top" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow">REFRACTION PLAYGROUND</p>
+        <h1 id="page-title">折一束光，<br><span>看見界面的選擇</span></h1>
+        <p class="hero-lead">拖動光源、換一組介質，親眼看見光何時靠近法線、何時遠離法線，以及何時乾脆不穿過界面。</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="#lab">開始實驗 <span aria-hidden="true">↓</span></a>
+          <a class="text-link" href="#layer-challenge">直接挑戰六層介質</a>
+        </div>
+      </div>
+      <div class="hero-orbit" aria-hidden="true">
+        <div class="orbit-card orbit-a"><span>n₁</span><strong>1.52</strong></div>
+        <div class="orbit-card orbit-b"><span>θ₁</span><strong>48°</strong></div>
+        <div class="hero-prism"></div>
+        <div class="hero-ray"></div>
+        <p>玻璃 → 空氣<br><strong>會穿過去嗎？</strong></p>
+      </div>
+    </section>
+
+    <section class="lab-section" id="lab" aria-labelledby="lab-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">INTERACTIVE LAB</p>
+          <h2 id="lab-title">一條光線，兩種介質</h2>
+        </div>
+        <p>角度一變，界面立刻回答。</p>
+      </div>
+
+      <div class="lab-shell">
+        <aside class="control-panel" aria-label="實驗控制台">
+          <div class="panel-heading">
+            <span class="step-number">01</span>
+            <div><strong>設定界面</strong><small>光由上方向下入射</small></div>
+          </div>
+
+          <label class="control-label" for="incident-medium">入射介質 n₁</label>
+          <div class="select-wrap">
+            <select id="incident-medium">
+              <option value="air">空氣 · 1.0003</option>
+              <option value="water">水 · 1.333</option>
+              <option value="ice">冰 · 1.309</option>
+              <option value="acrylic">壓克力 · 1.490</option>
+              <option value="glass" selected>玻璃 · 1.520</option>
+              <option value="diamond">鑽石 · 2.420</option>
+              <option value="custom">自訂折射率</option>
+            </select>
+          </div>
+          <div class="custom-row" id="incident-custom-wrap" hidden>
+            <label for="incident-custom">自訂 n₁</label>
+            <input id="incident-custom" type="number" min="1" max="3" step="0.001" value="1.520" inputmode="decimal">
+          </div>
+
+          <button class="swap-button" id="swap-media" type="button">
+            <span aria-hidden="true">⇅</span> 對調入射方向
+          </button>
+
+          <label class="control-label" for="transmitted-medium">穿透介質 n₂</label>
+          <div class="select-wrap">
+            <select id="transmitted-medium">
+              <option value="air" selected>空氣 · 1.0003</option>
+              <option value="water">水 · 1.333</option>
+              <option value="ice">冰 · 1.309</option>
+              <option value="acrylic">壓克力 · 1.490</option>
+              <option value="glass">玻璃 · 1.520</option>
+              <option value="diamond">鑽石 · 2.420</option>
+              <option value="custom">自訂折射率</option>
+            </select>
+          </div>
+          <div class="custom-row" id="transmitted-custom-wrap" hidden>
+            <label for="transmitted-custom">自訂 n₂</label>
+            <input id="transmitted-custom" type="number" min="1" max="3" step="0.001" value="1.000" inputmode="decimal">
+          </div>
+
+          <div class="divider"></div>
+          <div class="panel-heading compact">
+            <span class="step-number">02</span>
+            <div><strong>調整入射光</strong><small>也可以直接拖曳圖中的光源</small></div>
+          </div>
+          <div class="range-heading">
+            <label for="angle-range">入射角 θ₁</label>
+            <output id="angle-output" for="angle-range">48.0°</output>
+          </div>
+          <input id="angle-range" class="angle-range" type="range" min="0" max="89.5" step="0.1" value="48" aria-valuetext="48.0 度">
+          <div class="range-scale" aria-hidden="true"><span>0° 法線</span><span>89.5° 界面</span></div>
+
+          <p class="control-label preset-label">生活情境快速切換</p>
+          <div class="preset-grid" aria-label="情境預設">
+            <button type="button" class="preset" data-preset="pool">水中看天空</button>
+            <button type="button" class="preset" data-preset="fiber">光纖轉彎</button>
+            <button type="button" class="preset" data-preset="straw">吸管錯位</button>
+            <button type="button" class="preset" data-preset="diamond">鑽石閃耀</button>
+          </div>
+          <p class="validation-status" id="validation-status" role="status" aria-live="polite"></p>
+        </aside>
+
+        <div class="experiment-panel">
+          <div class="result-banner" id="result-banner" data-kind="tir">
+            <span class="result-dot" aria-hidden="true"></span>
+            <div>
+              <small id="result-kicker">目前狀態</small>
+              <strong id="result-title">全反射</strong>
+              <p id="result-explanation">入射角大於臨界角，沒有傳播到下方介質的折射光。</p>
+            </div>
+          </div>
+
+          <figure class="scene-figure">
+            <svg id="optics-scene" class="optics-scene" viewBox="0 0 900 560" role="group" aria-labelledby="scene-title scene-desc">
+              <title id="scene-title">光線在兩種介質界面的折射與反射圖</title>
+              <desc id="scene-desc">玻璃中的光以四十八度射向空氣，目前發生全反射。</desc>
+              <defs>
+                <linearGradient id="upper-gradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#dceff0"/>
+                  <stop offset="1" stop-color="#bddfe1"/>
+                </linearGradient>
+                <linearGradient id="lower-gradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#f5eee0"/>
+                  <stop offset="1" stop-color="#eee1ca"/>
+                </linearGradient>
+                <filter id="ray-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="5" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <rect id="upper-medium-fill" width="900" height="280" fill="url(#upper-gradient)"/>
+              <rect id="lower-medium-fill" y="280" width="900" height="280" fill="url(#lower-gradient)"/>
+              <path class="ambient-line" d="M0 214 Q150 180 300 214 T600 214 T900 214"/>
+              <path class="ambient-line lower" d="M0 456 Q150 420 300 456 T600 456 T900 456"/>
+              <line class="interface-line" x1="0" y1="280" x2="900" y2="280"/>
+              <line class="normal-line" x1="450" y1="34" x2="450" y2="526"/>
+              <text class="svg-label normal-label" x="466" y="68">法線</text>
+              <text class="svg-label interface-label" x="24" y="269">介面</text>
+              <text class="svg-medium-label" id="upper-medium-label" x="26" y="42">入射介質：玻璃 n₁ = 1.520</text>
+              <text class="svg-medium-label" id="lower-medium-label" x="26" y="322">穿透介質：空氣 n₂ = 1.0003</text>
+
+              <path id="incident-ray-glow" class="ray-glow" d=""/>
+              <path id="reflected-ray-glow" class="ray-glow reflected" d=""/>
+              <path id="transmitted-ray-glow" class="ray-glow transmitted" d=""/>
+              <path id="incident-ray" class="ray incident" d=""/>
+              <path id="reflected-ray" class="ray reflected" d=""/>
+              <path id="transmitted-ray" class="ray transmitted" d=""/>
+              <path id="incident-arc" class="angle-arc" d=""/>
+              <path id="refracted-arc" class="angle-arc refracted" d=""/>
+              <text id="incident-angle-label" class="angle-label" x="0" y="0">θ₁ 48.0°</text>
+              <text id="refracted-angle-label" class="angle-label refracted" x="0" y="0"></text>
+              <g id="tir-pulse" class="tir-pulse" aria-hidden="true">
+                <circle cx="450" cy="280" r="19"></circle>
+                <circle cx="450" cy="280" r="31"></circle>
+              </g>
+              <circle class="impact-point" cx="450" cy="280" r="7"/>
+              <circle id="source-handle" class="source-handle" cx="0" cy="0" r="18" tabindex="0" role="slider" aria-label="可拖曳光源；上下方向鍵調整入射角" aria-valuemin="0" aria-valuemax="89.5" aria-valuenow="48" aria-valuetext="入射角 48.0 度"></circle>
+              <text id="source-label" class="source-label" x="0" y="0">拖我</text>
+            </svg>
+            <figcaption id="scene-summary">黃色為入射光、粉紅色為反射光、藍色為折射光；線條亮度只用來示意能量比例，並非光束照片。</figcaption>
+          </figure>
+
+          <div class="metrics" aria-label="計算結果">
+            <article>
+              <span>折射角 θ₂</span>
+              <strong id="metric-refraction">—</strong>
+              <small id="metric-bending">無折射光</small>
+            </article>
+            <article>
+              <span>臨界角 θc</span>
+              <strong id="metric-critical">41.2°</strong>
+              <small id="metric-critical-note">僅限 n₁ &gt; n₂</small>
+            </article>
+            <article>
+              <span>反射能量 R</span>
+              <strong id="metric-reflectance">100%</strong>
+              <small>未偏振光的 Fresnel 估計</small>
+            </article>
+          </div>
+
+          <div class="energy-strip" aria-label="光能量比例示意">
+            <div class="energy-label"><span>反射 <strong id="reflection-percent">100%</strong></span><span>穿透 <strong id="transmission-percent">0%</strong></span></div>
+            <div class="energy-track"><span id="reflection-bar"></span><span id="transmission-bar"></span></div>
+          </div>
+
+          <div class="equation-readout" aria-live="polite" aria-atomic="true">
+            <span>Snell 定律即時計算</span>
+            <p id="equation-values">n₁ sin θ₁ = n₂ sin θ₂</p>
+          </div>
+          <p class="result-live" id="result-live" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="challenge-section" id="layer-challenge" aria-labelledby="challenge-title">
+      <div class="challenge-copy">
+        <p class="eyebrow">FROM YOUR QUESTION</p>
+        <h2 id="challenge-title">六層介質，哪些界面「有機會」全反射？</h2>
+        <p>先別急著算臨界角。光由上往下時，先找出折射率降低的界面；只有從光密介質射向光疏介質，才有可能全反射。</p>
+        <div class="challenge-tip"><strong>判斷兩關：</strong><span>① n₁ &gt; n₂</span><span>② θ₁ &gt; θc</span></div>
+        <button id="reveal-answer" class="reveal-button" type="button" aria-expanded="false" aria-controls="challenge-answer">揭曉候選界面</button>
+        <div id="challenge-answer" class="challenge-answer" hidden>
+          <strong>候選：A、B、D、E</strong>
+          <p>C 是 1.3 → 1.6，光進入折射率更大的介質，不可能發生全反射。候選界面仍須讓入射角超過各自臨界角才會真的全反射。</p>
+        </div>
+        <p id="boundary-live" class="boundary-live" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="layer-stack" aria-label="六層介質示意；點選界面可載入上方實驗">
+        <div class="medium-layer tone-1"><span>n₁</span><strong>1.7</strong></div>
+        <button class="boundary-button" data-boundary="0" type="button"><span>A</span><small>載入界面</small></button>
+        <div class="medium-layer tone-2"><span>n₂</span><strong>1.5</strong></div>
+        <button class="boundary-button" data-boundary="1" type="button"><span>B</span><small>載入界面</small></button>
+        <div class="medium-layer tone-3"><span>n₃</span><strong>1.3</strong></div>
+        <button class="boundary-button" data-boundary="2" type="button"><span>C</span><small>載入界面</small></button>
+        <div class="medium-layer tone-4"><span>n₄</span><strong>1.6</strong></div>
+        <button class="boundary-button" data-boundary="3" type="button"><span>D</span><small>載入界面</small></button>
+        <div class="medium-layer tone-5"><span>n₅</span><strong>1.4</strong></div>
+        <button class="boundary-button" data-boundary="4" type="button"><span>E</span><small>載入界面</small></button>
+        <div class="medium-layer tone-6"><span>n₆</span><strong>1.0</strong></div>
+      </div>
+    </section>
+
+    <section class="concept-section" aria-labelledby="concept-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">READ THE RAYS</p><h2 id="concept-title">不用背方向，讀懂三個畫面</h2></div>
+      </div>
+      <div class="concept-grid">
+        <article><span class="concept-icon toward" aria-hidden="true">↘│</span><p class="concept-number">01</p><h3>進入較大 n</h3><p>速度變慢，折射光<strong>向法線偏折</strong>，所以 θ₂ &lt; θ₁。</p></article>
+        <article><span class="concept-icon away" aria-hidden="true">│↘</span><p class="concept-number">02</p><h3>進入較小 n</h3><p>速度變快，折射光<strong>離法線偏折</strong>，所以 θ₂ &gt; θ₁。</p></article>
+        <article><span class="concept-icon bounce" aria-hidden="true">↘↗</span><p class="concept-number">03</p><h3>越過臨界角</h3><p>當 n₁ &gt; n₂ 且 θ₁ &gt; θc，折射角無實數解，形成<strong>全反射</strong>。</p></article>
+      </div>
+    </section>
+
+    <section class="theory-section" aria-labelledby="theory-title">
+      <div>
+        <p class="eyebrow">THE MODEL</p>
+        <h2 id="theory-title">兩條式子，解釋全部畫面</h2>
+        <p>角度一律從法線量起。折射率 n = c/v，n 越大代表光在該介質中的速率越慢。</p>
+      </div>
+      <div class="formula-card">
+        <span>斯涅耳定律</span>
+        <p>n₁ sin θ₁ = n₂ sin θ₂</p>
+        <small>n₁、n₂：兩側介質折射率；θ₁：入射角；θ₂：折射角。</small>
+      </div>
+      <div class="formula-card accent">
+        <span>臨界角（僅 n₁ &gt; n₂）</span>
+        <p>θc = sin⁻¹(n₂ / n₁)</p>
+        <small>θ₁ = θc 時折射光沿界面前進；θ₁ &gt; θc 才是全反射。</small>
+      </div>
+    </section>
+
+    <section class="limits-section" aria-labelledby="limits-title">
+      <h2 id="limits-title">模型邊界</h2>
+      <p>本模擬採用平坦界面、均勻且各向同性的透明介質、單色窄光束；忽略吸收、散射、表面粗糙與色散。能量比例使用未偏振光的 Fresnel 方程估計。真實材料的折射率會隨波長、溫度與成分略變。</p>
+    </section>
+  </main>
+
+  <footer><p>給課堂提問、預測與驗證使用。</p><a href="#top">回到頁首 ↑</a></footer>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
