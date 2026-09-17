@@ -56,9 +56,30 @@ const viewports = [
 ];
 const report = { baseUrl, viewports: [], interaction: {}, generatedAt: new Date().toISOString() };
 
+function parseColor(color) {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const full = hex.length === 3 ? [...hex].map((part) => part + part).join('') : hex;
+    return [0, 2, 4].map((offset) => Number.parseInt(full.slice(offset, offset + 2), 16));
+  }
+  const match = color.match(/rgba?\((\d+)[, ]+(\d+)[, ]+(\d+)/);
+  if (!match) throw new Error(`Unsupported color: ${color}`);
+  return match.slice(1, 4).map(Number);
+}
+
+function contrastRatio(foreground, background) {
+  const luminance = (color) => {
+    const channels = parseColor(color).map((value) => value / 255)
+      .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 async function assertLayout(page, viewport) {
   const geometry = await page.evaluate(() => {
-    const interactive = [...document.querySelectorAll('button, select, input, a[href]')]
+    const interactive = [...document.querySelectorAll('button, select, input, a[href], [role="slider"]')]
       .filter((element) => {
         const style = getComputedStyle(element);
         return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length;
@@ -120,12 +141,75 @@ async function assertAccessibility(page, viewport) {
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
   }));
   assert.deepEqual(results.violations, [], `${viewport.name}: axe violations ${JSON.stringify(results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })))}`);
-  return { violations: 0, incomplete: results.incomplete.map((entry) => ({ id: entry.id, nodes: entry.nodes.length })) };
+  const unexpectedIncomplete = results.incomplete
+    .filter((entry) => entry.id !== 'color-contrast')
+    .map((entry) => ({ id: entry.id, nodes: entry.nodes.length }));
+  assert.deepEqual(unexpectedIncomplete, [], `${viewport.name}: unresolved axe incomplete ${JSON.stringify(unexpectedIncomplete)}`);
+
+  const contrastPairs = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const upperDark = document.querySelector('#upper-gradient stop[offset="1"]').getAttribute('stop-color');
+    const lowerDark = document.querySelector('#lower-gradient stop[offset="1"]').getAttribute('stop-color');
+    const style = (selector, property) => getComputedStyle(document.querySelector(selector))[property];
+    return [
+      ['ink/paper', root.getPropertyValue('--ink').trim(), root.getPropertyValue('--paper').trim(), 4.5],
+      ['soft/paper', root.getPropertyValue('--ink-soft').trim(), root.getPropertyValue('--paper').trim(), 4.5],
+      ['teal/paper', root.getPropertyValue('--teal').trim(), root.getPropertyValue('--paper').trim(), 4.5],
+      ['white/ink', '#ffffff', root.getPropertyValue('--ink').trim(), 4.5],
+      ['ink/yellow', root.getPropertyValue('--ink').trim(), root.getPropertyValue('--yellow').trim(), 4.5],
+      ['svg text/upper', style('.svg-label', 'fill'), upperDark, 4.5],
+      ['svg text/lower', style('.svg-label', 'fill'), lowerDark, 4.5],
+      ['refracted label/lower', style('.angle-label.refracted', 'fill'), lowerDark, 4.5],
+      ['incident ray/upper', style('#incident-ray', 'stroke'), upperDark, 3],
+      ['reflected ray/upper', style('#reflected-ray', 'stroke'), upperDark, 3],
+      ['transmitted ray/lower', style('#transmitted-ray', 'stroke'), lowerDark, 3],
+    ];
+  });
+  const measured = contrastPairs.map(([name, foreground, background, minimum]) => ({
+    name, foreground, background, minimum, ratio: contrastRatio(foreground, background),
+  }));
+  const failures = measured.filter((entry) => entry.ratio < entry.minimum);
+  assert.deepEqual(failures, [], `${viewport.name}: contrast failures ${JSON.stringify(failures)}`);
+  return {
+    violations: 0,
+    incomplete: results.incomplete.map((entry) => ({ id: entry.id, nodes: entry.nodes.length })),
+    minimumTextContrast: Math.min(...measured.filter((entry) => entry.minimum === 4.5).map((entry) => entry.ratio)),
+    minimumGraphicContrast: Math.min(...measured.filter((entry) => entry.minimum === 3).map((entry) => entry.ratio)),
+  };
 }
 
 async function runInteractions(page) {
   const initial = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
   assert.equal(initial.totalInternalReflection, true, 'default glass-to-air scene should demonstrate TIR');
+
+  for (const angle of [0, 89.5]) {
+    assert.equal(await page.evaluate((value) => window.__OPTICS_LAB__.setAngle(value), angle), true);
+    const extrema = await page.evaluate(() => {
+      const label = document.getElementById('source-label');
+      const box = label.getBBox();
+      const paths = [...document.querySelectorAll('#optics-scene path')]
+        .filter((path) => !path.hasAttribute('hidden'))
+        .map((path) => path.getAttribute('d') || '');
+      return {
+        labelVisible: label.getClientRects().length > 0,
+        labelBox: { x: box.x, y: box.y, width: box.width, height: box.height },
+        paths,
+      };
+    });
+    if (extrema.labelVisible) {
+      const box = extrema.labelBox;
+      assert.ok(box.x >= -1 && box.y >= -1 && box.x + box.width <= 901 && box.y + box.height <= 561,
+        `${angle}°: drag label must stay inside the SVG`);
+    }
+    assert.equal(extrema.paths.some((path) => /NaN|Infinity/.test(path)), false, `${angle}°: finite SVG paths`);
+  }
+
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setAngle(41.1)), true);
+  assert.match(await page.locator('#result-title').textContent(), /離法線偏折/);
+  assert.notEqual(await page.locator('#metric-refraction').textContent(), '—');
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setAngle(41.2)), true);
+  assert.match(await page.locator('#result-title').textContent(), /全反射/);
+  assert.match(await page.locator('#result-explanation').textContent(), /41\.20°.*41\.15°/);
 
   assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setAngle(30)), true);
   assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.snapshot.totalInternalReflection), false);
@@ -166,11 +250,24 @@ async function runInteractions(page) {
   assert.equal(straw.n2, 1.333);
   assert.equal(straw.totalInternalReflection, false);
 
+  await page.locator('[data-preset="fiber"]').click();
+  const fiber = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
+  assert.equal(fiber.n1, 1.5);
+  assert.equal(fiber.n2, 1.46);
+  assert.equal(fiber.totalInternalReflection, true);
+
   await page.locator('[data-boundary="2"]').click();
   const layerC = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
   assert.equal(layerC.n1, 1.3);
   assert.equal(layerC.n2, 1.6);
   assert.equal(layerC.totalInternalReflection, false);
+
+  await page.locator('[data-boundary="3"]').click();
+  const layerD = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
+  assert.equal(layerD.n1, 1.6);
+  assert.equal(layerD.n2, 1.4);
+  assert.equal(layerD.totalInternalReflection, false, 'D is path-limited by the earlier n=1.3 layer');
+  assert.match(await page.locator('#boundary-live').textContent(), /先前.*1\.3|最低折射率.*1\.3/);
 
   await page.locator('[data-boundary="0"]').click();
   const layerA = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
@@ -180,7 +277,7 @@ async function runInteractions(page) {
 
   await page.locator('#reveal-answer').click();
   assert.equal(await page.locator('#challenge-answer').isVisible(), true);
-  assert.match(await page.locator('#challenge-answer').textContent(), /A、B、D、E/);
+  assert.match(await page.locator('#challenge-answer').textContent(), /A、B、E/);
 
   const beforeInvalid = await page.evaluate(() => JSON.stringify(window.__OPTICS_LAB__.snapshot));
   await page.locator('#incident-custom').fill('');

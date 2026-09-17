@@ -19,17 +19,30 @@ export function classifyInterfaces(indices) {
     throw new RangeError('indices must contain 2 to 27 refractive indices');
   }
   const clean = indices.map((value, index) => requireIndex(value, `indices[${index}]`));
-  return Object.freeze(clean.slice(0, -1).map((n1, index) => {
+  let maxInvariant = clean[0];
+  const interfaces = clean.slice(0, -1).map((n1, index) => {
     const n2 = clean[index + 1];
-    return Object.freeze({
+    const localCanTir = n1 > n2;
+    const canTir = maxInvariant > n2;
+    let reason = 'equal-index';
+    if (canTir) reason = 'reachable-high-to-low';
+    else if (n1 < n2) reason = 'low-to-high';
+    else if (localCanTir) reason = 'path-limited';
+    const entry = Object.freeze({
       label: String.fromCharCode(65 + index),
       n1,
       n2,
-      canTir: n1 > n2,
-      reason: n1 > n2 ? 'high-to-low' : n1 < n2 ? 'low-to-high' : 'equal-index',
-      criticalDeg: n1 > n2 ? Math.asin(n2 / n1) / DEG : null,
+      localCanTir,
+      canTir,
+      reason,
+      maxInvariant,
+      maxIncidentDeg: Math.asin(Math.min(1, maxInvariant / n1)) / DEG,
+      criticalDeg: localCanTir ? Math.asin(n2 / n1) / DEG : null,
     });
-  }));
+    maxInvariant = Math.min(maxInvariant, n2);
+    return entry;
+  });
+  return Object.freeze(interfaces);
 }
 
 export function solveOptics(state) {
@@ -40,14 +53,18 @@ export function solveOptics(state) {
   const n1 = requireIndex(state.n1, 'n1');
   const n2 = requireIndex(state.n2, 'n2');
   const incidentDeg = requireAngle(state.incidentDeg);
-  const sinTheta2 = (n1 / n2) * Math.sin(incidentDeg * DEG);
-  const totalInternalReflection = sinTheta2 > 1;
   const theta1 = incidentDeg * DEG;
+  const sinTheta2 = (n1 / n2) * Math.sin(theta1);
+  const criticalDeg = n1 > n2 ? Math.asin(n2 / n1) / DEG : null;
+  const angleTolerance = 16 * Number.EPSILON
+    * Math.max(1, Math.abs(incidentDeg), Math.abs(criticalDeg ?? 0));
+  const criticalDelta = criticalDeg === null ? null : incidentDeg - criticalDeg;
+  const atCritical = criticalDelta !== null && Math.abs(criticalDelta) <= angleTolerance;
+  const totalInternalReflection = criticalDelta !== null && criticalDelta > angleTolerance;
   const theta2 = totalInternalReflection
     ? null
-    : Math.asin(Math.min(1, sinTheta2));
+    : atCritical ? Math.PI / 2 : Math.asin(Math.max(-1, Math.min(1, sinTheta2)));
   const refractedDeg = theta2 === null ? null : theta2 / DEG;
-  const criticalDeg = n1 > n2 ? Math.asin(n2 / n1) / DEG : null;
 
   let reflectance = 1;
   if (!totalInternalReflection) {
@@ -71,6 +88,7 @@ export function solveOptics(state) {
     reflectedDeg: incidentDeg,
     refractedDeg,
     criticalDeg,
+    atCritical,
     totalInternalReflection,
     reflectance,
     transmittance,

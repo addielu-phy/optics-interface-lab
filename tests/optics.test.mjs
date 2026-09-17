@@ -29,22 +29,29 @@ test('glass to air reports its critical angle and total internal reflection', ()
   assert.equal(above.transmittance, 0);
 });
 
-test('six-layer question identifies only high-to-low interfaces as TIR candidates', () => {
+test('six-layer question includes path constraints from earlier parallel interfaces', () => {
   const interfaces = classifyInterfaces([1.7, 1.5, 1.3, 1.6, 1.4, 1.0]);
 
   assert.deepEqual(
     interfaces.filter((entry) => entry.canTir).map((entry) => entry.label),
-    ['A', 'B', 'D', 'E'],
+    ['A', 'B', 'E'],
   );
   assert.equal(interfaces[2].reason, 'low-to-high');
+  assert.equal(interfaces[3].reason, 'path-limited');
+  closeTo(interfaces[3].maxInvariant, 1.3);
 });
 
-test('critical-angle equality is grazing refraction rather than TIR', () => {
-  const criticalDeg = Math.asin(1 / 1.5) * 180 / Math.PI;
-  const result = solveOptics({ n1: 1.5, n2: 1, incidentDeg: criticalDeg });
+test('critical-angle equality is grazing refraction rather than TIR across custom indices', () => {
+  for (const [n1, n2] of [[1.5, 1], [1.005, 1.004], [1.032, 1.016], [1.7, 1.5], [2.42, 1.333]]) {
+    const criticalDeg = Math.asin(n2 / n1) * 180 / Math.PI;
+    const atCritical = solveOptics({ n1, n2, incidentDeg: criticalDeg });
+    const aboveCritical = solveOptics({ n1, n2, incidentDeg: criticalDeg + 1e-7 });
 
-  assert.equal(result.totalInternalReflection, false);
-  closeTo(result.refractedDeg, 90, 1e-7);
+    assert.equal(atCritical.totalInternalReflection, false, `${n1} → ${n2} equality`);
+    assert.equal(atCritical.atCritical, true, `${n1} → ${n2} equality marker`);
+    closeTo(atCritical.refractedDeg, 90, 1e-6);
+    assert.equal(aboveCritical.totalInternalReflection, true, `${n1} → ${n2} above critical`);
+  }
 });
 
 test('normal-incidence Fresnel reflectance matches the analytical value', () => {

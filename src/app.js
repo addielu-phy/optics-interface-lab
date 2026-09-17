@@ -6,12 +6,14 @@ const MEDIA = Object.freeze({
   ice: Object.freeze({ name: '冰', n: 1.309 }),
   acrylic: Object.freeze({ name: '壓克力', n: 1.49 }),
   glass: Object.freeze({ name: '玻璃', n: 1.52 }),
+  fiberCore: Object.freeze({ name: '光纖核心', n: 1.5 }),
+  fiberCladding: Object.freeze({ name: '光纖包層', n: 1.46 }),
   diamond: Object.freeze({ name: '鑽石', n: 2.42 }),
 });
 
 const PRESETS = Object.freeze({
   pool: Object.freeze({ top: 'water', bottom: 'air', angle: 55, side: -1 }),
-  fiber: Object.freeze({ top: 'glass', bottom: 'air', angle: 50, side: -1 }),
+  fiber: Object.freeze({ top: 'fiberCore', bottom: 'fiberCladding', angle: 80, side: -1 }),
   straw: Object.freeze({ top: 'air', bottom: 'water', angle: 55, side: -1 }),
   diamond: Object.freeze({ top: 'diamond', bottom: 'air', angle: 30, side: -1 }),
 });
@@ -37,6 +39,7 @@ const dom = Object.freeze({
   scene: byId('optics-scene'),
   sceneDesc: byId('scene-desc'),
   source: byId('source-handle'),
+  sourceHit: byId('source-hit'),
   sourceLabel: byId('source-label'),
   upperLabel: byId('upper-medium-label'),
   lowerLabel: byId('lower-medium-label'),
@@ -127,10 +130,10 @@ function statusCopy(model) {
   if (model.totalInternalReflection) {
     return {
       kind: 'tir', title: '全反射',
-      explanation: `入射角 ${fixed(model.incidentDeg)}° 大於臨界角 ${fixed(model.criticalDeg)}°，沒有傳播到下方介質的折射光。`,
+      explanation: `入射角 ${fixed(model.incidentDeg, 2)}° 大於臨界角 ${fixed(model.criticalDeg, 2)}°，沒有傳播到下方介質的折射光。`,
     };
   }
-  if (model.criticalDeg !== null && Math.abs(model.incidentDeg - model.criticalDeg) < 0.06) {
+  if (model.atCritical) {
     return { kind: 'critical', title: '臨界狀態', explanation: '折射角正好是 90°，折射光沿著界面前進。' };
   }
   if (model.bending === 'toward-normal') return { kind: 'refraction', title: '向法線偏折', explanation: '光進入折射率較大的介質，速率變慢，折射角小於入射角。' };
@@ -141,7 +144,7 @@ function statusCopy(model) {
 function render(nextState, model, { announce = true } = {}) {
   const cx = 450;
   const cy = 280;
-  const incidentLength = 244;
+  const incidentLength = 200;
   const outgoingLength = 235;
   const source = pointOnRay(cx, cy, nextState.angle, incidentLength, nextState.side, false);
   const reflected = pointOnRay(cx, cy, nextState.angle, outgoingLength, -nextState.side, false);
@@ -151,12 +154,13 @@ function render(nextState, model, { announce = true } = {}) {
   setPath(dom.reflectedRay, impact, reflected);
   setPath(dom.reflectedGlow, impact, reflected);
 
-  dom.source.setAttribute('cx', fixed(source.x, 2));
-  dom.source.setAttribute('cy', fixed(source.y, 2));
+  const sceneScale = dom.scene.getBoundingClientRect().width / 900 || 1;
+  dom.sourceHit.setAttribute('r', fixed(Math.max(24, 22 / sceneScale), 2));
+  dom.source.setAttribute('transform', `translate(${fixed(source.x, 2)} ${fixed(source.y, 2)})`);
   dom.source.setAttribute('aria-valuenow', fixed(nextState.angle));
   dom.source.setAttribute('aria-valuetext', `入射角 ${fixed(nextState.angle)} 度`);
-  dom.sourceLabel.setAttribute('x', fixed(source.x + (nextState.side < 0 ? -39 : 25), 2));
-  dom.sourceLabel.setAttribute('y', fixed(source.y - 26, 2));
+  dom.sourceLabel.setAttribute('x', fixed(source.x + (nextState.side < 0 ? -68 : 32), 2));
+  dom.sourceLabel.setAttribute('y', fixed(Math.max(32, source.y - 26), 2));
 
   const incidentEndAngle = nextState.side < 0 ? -90 - nextState.angle : -90 + nextState.angle;
   dom.incidentArc.setAttribute('d', arcPath(cx, cy, 72, -90, incidentEndAngle));
@@ -207,7 +211,7 @@ function render(nextState, model, { announce = true } = {}) {
   dom.resultExplanation.textContent = copy.explanation;
   dom.metricRefraction.textContent = model.refractedDeg === null ? '—' : `${fixed(model.refractedDeg)}°`;
   dom.metricBending.textContent = model.refractedDeg === null ? '無折射光' : model.bending === 'toward-normal' ? '向法線偏折' : model.bending === 'away-from-normal' ? '離法線偏折' : '不偏折';
-  dom.metricCritical.textContent = model.criticalDeg === null ? '不存在' : `${fixed(model.criticalDeg)}°`;
+  dom.metricCritical.textContent = model.criticalDeg === null ? '不存在' : `${fixed(model.criticalDeg, 2)}°`;
   dom.metricCriticalNote.textContent = model.criticalDeg === null ? 'n₁ ≤ n₂ 時沒有臨界角' : '僅限 n₁ > n₂';
   const rPercent = model.reflectance * 100;
   const tPercent = model.transmittance * 100;
@@ -325,12 +329,18 @@ dom.source.addEventListener('keydown', (event) => {
   dom.angle.value = String(Math.max(0, Math.min(89.5, angle)));
   commitFromControls();
 });
+window.addEventListener('resize', () => render(state, snapshot, { announce: false }));
 
 dom.reveal.addEventListener('click', () => {
   const nextHidden = !dom.answer.hidden;
   dom.answer.hidden = nextHidden;
   dom.reveal.setAttribute('aria-expanded', String(!nextHidden));
   dom.reveal.textContent = nextHidden ? '揭曉候選界面' : '收起答案';
+  document.querySelectorAll('[data-boundary]').forEach((button) => {
+    const boundary = layerInterfaces[Number(button.dataset.boundary)];
+    button.classList.toggle('candidate', !nextHidden && boundary.canTir);
+    button.classList.toggle('not-candidate', !nextHidden && !boundary.canTir);
+  });
 });
 
 document.querySelectorAll('[data-boundary]').forEach((button) => {
@@ -342,13 +352,23 @@ document.querySelectorAll('[data-boundary]').forEach((button) => {
     dom.bottomSelect.value = 'custom';
     dom.topCustom.value = String(boundary.n1);
     dom.bottomCustom.value = String(boundary.n2);
-    const demonstrationAngle = boundary.canTir ? Math.min(85, boundary.criticalDeg + 7) : 55;
-    dom.angle.value = fixed(demonstrationAngle);
+    let demonstrationAngle = 55;
+    if (boundary.canTir) {
+      const demonstrationInvariant = (boundary.maxInvariant + boundary.n2) / 2;
+      demonstrationAngle = Math.asin(demonstrationInvariant / boundary.n1) * 180 / Math.PI;
+    } else if (boundary.reason === 'path-limited') {
+      demonstrationAngle = boundary.maxIncidentDeg;
+    }
+    dom.angle.value = fixed(Math.min(89.5, demonstrationAngle));
     state = Object.freeze({ ...state, side: -1 });
     commitFromControls();
-    dom.boundaryLive.textContent = boundary.canTir
-      ? `已載入界面 ${boundary.label}：${boundary.n1} → ${boundary.n2}，入射角設為臨界角以上。`
-      : `已載入界面 ${boundary.label}：${boundary.n1} → ${boundary.n2}，折射率上升，所以不可能全反射。`;
+    if (boundary.canTir) {
+      dom.boundaryLive.textContent = `已載入界面 ${boundary.label}：可抵達此處的 K 最大為 ${fixed(boundary.maxInvariant, 1)}，大於下一層 ${fixed(boundary.n2, 1)}，所以有機會全反射。`;
+    } else if (boundary.reason === 'path-limited') {
+      dom.boundaryLive.textContent = `界面 ${boundary.label} 單看是高到低，但先前最低折射率為 ${fixed(boundary.maxInvariant, 1)}；抵達時最大入射角 ${fixed(boundary.maxIncidentDeg)}° 仍小於臨界角 ${fixed(boundary.criticalDeg)}°。`;
+    } else {
+      dom.boundaryLive.textContent = `已載入界面 ${boundary.label}：${boundary.n1} → ${boundary.n2}，折射率上升，所以不可能全反射。`;
+    }
     document.querySelectorAll('[data-boundary]').forEach((item) => item.removeAttribute('aria-current'));
     button.setAttribute('aria-current', 'true');
   });
