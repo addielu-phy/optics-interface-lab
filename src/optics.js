@@ -14,6 +14,12 @@ function requireAngle(value) {
   return value;
 }
 
+function requireLayerAngle(value) {
+  const angle = requireAngle(value);
+  if (angle > 75) throw new RangeError('incidentDeg must be a finite number from 0 to 75 for the six-interface model');
+  return angle;
+}
+
 export function classifyInterfaces(indices) {
   if (!Array.isArray(indices) || indices.length < 2 || indices.length > 27) {
     throw new RangeError('indices must contain 2 to 27 refractive indices');
@@ -93,5 +99,94 @@ export function solveOptics(state) {
     reflectance,
     transmittance,
     bending,
+  });
+}
+
+export function traceLayerStack(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    throw new RangeError('state must be an object');
+  }
+  if (!Array.isArray(state.indices) || state.indices.length !== 7) {
+    throw new RangeError('indices must contain exactly 7 refractive indices for 6 interfaces');
+  }
+
+  const indices = Object.freeze(state.indices.map((value, index) => requireIndex(value, `indices[${index}]`)));
+  const incidentDeg = requireLayerAngle(state.incidentDeg);
+  const invariant = indices[0] * Math.sin(incidentDeg * DEG);
+  const events = [];
+  let currentAngle = incidentDeg;
+  let incomingPower = 1;
+  let blockedBy = null;
+  let termination = 'exited-bottom';
+  let terminatedAt = null;
+
+  for (let index = 0; index < 6; index += 1) {
+    const label = String.fromCharCode(65 + index);
+    const n1 = indices[index];
+    const n2 = indices[index + 1];
+
+    if (blockedBy !== null) {
+      events.push(Object.freeze({
+        label,
+        n1,
+        n2,
+        reached: false,
+        blockedBy,
+        incidentDeg: null,
+        reflectedDeg: null,
+        refractedDeg: null,
+        criticalDeg: n1 > n2 ? Math.asin(n2 / n1) / DEG : null,
+        atCritical: false,
+        totalInternalReflection: false,
+        reflectance: null,
+        transmittance: null,
+        incomingPower: 0,
+        reflectedPower: 0,
+        transmittedPower: 0,
+        bending: null,
+      }));
+      continue;
+    }
+
+    const model = solveOptics({ n1, n2, incidentDeg: currentAngle });
+    const reflectedPower = incomingPower * model.reflectance;
+    const transmittedPower = incomingPower * model.transmittance;
+    events.push(Object.freeze({
+      label,
+      ...model,
+      reached: true,
+      blockedBy: null,
+      incomingPower,
+      reflectedPower,
+      transmittedPower,
+    }));
+
+    if (model.totalInternalReflection) {
+      termination = 'total-internal-reflection';
+      terminatedAt = label;
+      blockedBy = label;
+      incomingPower = 0;
+    } else if (model.atCritical) {
+      termination = 'grazing';
+      terminatedAt = label;
+      blockedBy = label;
+      incomingPower = 0;
+    } else {
+      currentAngle = model.refractedDeg;
+      incomingPower = transmittedPower;
+    }
+  }
+
+  const exitPower = termination === 'exited-bottom' ? incomingPower : 0;
+  const totalReflectedPower = events.reduce((sum, event) => sum + event.reflectedPower, 0);
+  return Object.freeze({
+    indices,
+    incidentDeg,
+    invariant,
+    events: Object.freeze(events),
+    termination,
+    terminatedAt,
+    exitPower,
+    totalReflectedPower,
   });
 }

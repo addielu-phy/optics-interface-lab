@@ -1,4 +1,4 @@
-import { classifyInterfaces, solveOptics } from './optics.js';
+import { solveOptics, traceLayerStack } from './optics.js';
 
 const MEDIA = Object.freeze({
   air: Object.freeze({ name: '空氣', n: 1.0003 }),
@@ -18,8 +18,14 @@ const PRESETS = Object.freeze({
   diamond: Object.freeze({ top: 'diamond', bottom: 'air', angle: 30, side: -1 }),
 });
 
-const LAYER_INDICES = Object.freeze([1.7, 1.5, 1.3, 1.6, 1.4, 1.0]);
-const layerInterfaces = classifyInterfaces(LAYER_INDICES);
+const LAYER_DEFAULT_INDICES = Object.freeze([1.7, 1.5, 1.3, 1.6, 1.4, 1.2, 1.0]);
+const LAYER_PRESETS = Object.freeze({
+  through: Object.freeze({ indices: LAYER_DEFAULT_INDICES, angle: 30 }),
+  'deep-tir': Object.freeze({ indices: LAYER_DEFAULT_INDICES, angle: 45 }),
+  'early-tir': Object.freeze({ indices: LAYER_DEFAULT_INDICES, angle: 65 }),
+});
+const LAYER_COLORS = Object.freeze(['#c8e7e5', '#d9ece8', '#eef2db', '#f5e7bd', '#f6d9bc', '#f3c7bb', '#dfd3ea']);
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const byId = (id) => document.getElementById(id);
 const dom = Object.freeze({
   topSelect: byId('incident-medium'),
@@ -64,15 +70,32 @@ const dom = Object.freeze({
   reflectionBar: byId('reflection-bar'),
   transmissionBar: byId('transmission-bar'),
   equation: byId('equation-values'),
-  reveal: byId('reveal-answer'),
-  answer: byId('challenge-answer'),
-  boundaryLive: byId('boundary-live'),
+  layerAngle: byId('layer-angle-range'),
+  layerAngleOutput: byId('layer-angle-output'),
+  layerInputs: Object.freeze([...document.querySelectorAll('[data-layer-index]')]),
+  layerValidation: byId('layer-validation'),
+  layerScene: byId('layer-scene'),
+  layerSceneDesc: byId('layer-scene-desc'),
+  layerBackgrounds: byId('layer-backgrounds'),
+  layerRays: byId('layer-rays'),
+  layerAnnotations: byId('layer-annotations'),
+  layerResultBanner: byId('layer-result-banner'),
+  layerResultTitle: byId('layer-result-title'),
+  layerResultExplanation: byId('layer-result-explanation'),
+  layerInvariant: byId('layer-invariant'),
+  layerReflectedTotal: byId('layer-reflected-total'),
+  layerExitPower: byId('layer-exit-power'),
+  layerEventBody: byId('layer-event-body'),
+  layerLive: byId('layer-live'),
 });
 
 let state = Object.freeze({ angle: 48, side: -1, n1: MEDIA.glass.n, n2: MEDIA.air.n, topName: '玻璃', bottomName: '空氣' });
 let snapshot = solveOptics({ n1: state.n1, n2: state.n2, incidentDeg: state.angle });
+let layerState = Object.freeze({ indices: LAYER_DEFAULT_INDICES, angle: 30 });
+let layerSnapshot = traceLayerStack({ indices: [...layerState.indices], incidentDeg: layerState.angle });
 let dragging = false;
 let announceTimer = 0;
+let layerAnnounceTimer = 0;
 
 function fixed(value, digits = 1) {
   return Number(value).toFixed(digits);
@@ -280,6 +303,256 @@ function swapMedia() {
   commitFromControls();
 }
 
+function svgNode(name, attributes = {}, text = '') {
+  const node = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+  if (text) node.textContent = text;
+  return node;
+}
+
+function layerGeometry(trace) {
+  const unitImpacts = [];
+  const samples = [0];
+  let x = 0;
+  let y = 0.18;
+  let angle = trace.incidentDeg;
+
+  for (let index = 0; index < trace.events.length; index += 1) {
+    const event = trace.events[index];
+    if (!event.reached) break;
+    const targetY = index + 1;
+    x += Math.tan(angle * Math.PI / 180) * (targetY - y);
+    y = targetY;
+    unitImpacts.push({ x, y, event });
+    samples.push(x, x + Math.tan(event.incidentDeg * Math.PI / 180) * 0.62);
+    if (event.totalInternalReflection || event.atCritical) break;
+    angle = event.refractedDeg;
+  }
+
+  let unitExit = null;
+  if (trace.termination === 'exited-bottom') {
+    const targetY = 7;
+    x += Math.tan(angle * Math.PI / 180) * (targetY - y);
+    unitExit = { x, y: targetY };
+    samples.push(x);
+  }
+
+  const minX = Math.min(...samples);
+  const maxX = Math.max(...samples);
+  const span = Math.max(0.1, maxX - minX);
+  const layerHeight = Math.max(22, Math.min(82, 700 / (span + 1.7), 620 / 7));
+  const topY = (700 - 7 * layerHeight) / 2;
+  const originX = 450 - ((minX + maxX) / 2) * layerHeight;
+  const point = (unitPoint) => ({ x: originX + unitPoint.x * layerHeight, y: topY + unitPoint.y * layerHeight });
+
+  return Object.freeze({
+    layerHeight,
+    topY,
+    bottomY: topY + 7 * layerHeight,
+    source: point({ x: 0, y: 0.18 }),
+    impacts: Object.freeze(unitImpacts.map((impact) => Object.freeze({ ...point(impact), event: impact.event }))),
+    exit: unitExit ? point(unitExit) : null,
+  });
+}
+
+function renderLayerBackgrounds(trace, geometry) {
+  dom.layerBackgrounds.replaceChildren();
+  dom.layerAnnotations.replaceChildren();
+  const showMediumLabels = geometry.layerHeight >= 46;
+
+  trace.indices.forEach((indexValue, index) => {
+    const y = geometry.topY + index * geometry.layerHeight;
+    dom.layerBackgrounds.append(svgNode('rect', {
+      class: 'layer-medium-fill', x: 0, y: fixed(y, 2), width: 900,
+      height: fixed(geometry.layerHeight, 2), fill: LAYER_COLORS[index],
+    }));
+    if (showMediumLabels) {
+      dom.layerAnnotations.append(svgNode('text', {
+        class: 'layer-medium-text', x: 20, y: fixed(y + geometry.layerHeight * 0.58, 2),
+      }, `介質 ${index + 1}　n = ${fixed(indexValue, 3)}`));
+    }
+  });
+
+  trace.events.forEach((event, index) => {
+    const y = geometry.topY + (index + 1) * geometry.layerHeight;
+    dom.layerBackgrounds.append(svgNode('line', {
+      class: `layer-interface-line${event.reached ? '' : ' blocked'}`,
+      x1: 0, y1: fixed(y, 2), x2: 900, y2: fixed(y, 2),
+    }));
+    if (showMediumLabels) {
+      dom.layerAnnotations.append(svgNode('text', {
+        class: 'layer-interface-text', x: 820, y: fixed(y - 8, 2),
+      }, `界面 ${event.label}`));
+    }
+  });
+}
+
+function renderLayerRays(trace, geometry) {
+  dom.layerRays.replaceChildren();
+  const pathPoints = [geometry.source, ...geometry.impacts.map(({ x, y }) => ({ x, y }))];
+  if (geometry.exit) pathPoints.push(geometry.exit);
+
+  for (let index = 1; index < pathPoints.length; index += 1) {
+    const from = pathPoints[index - 1];
+    const to = pathPoints[index];
+    const incoming = index <= geometry.impacts.length
+      ? geometry.impacts[index - 1].event.incomingPower
+      : trace.exitPower;
+    dom.layerRays.append(svgNode('path', {
+      class: `layer-primary-ray${index === 1 ? ' source-segment' : ''}`,
+      d: `M ${fixed(from.x, 2)} ${fixed(from.y, 2)} L ${fixed(to.x, 2)} ${fixed(to.y, 2)}`,
+      opacity: fixed(Math.max(0.24, Math.sqrt(Math.max(0, incoming))), 3),
+    }));
+  }
+
+  geometry.impacts.forEach((impact) => {
+    const { event } = impact;
+    const branchDy = geometry.layerHeight * 0.62;
+    const branchDx = Math.tan(event.incidentDeg * Math.PI / 180) * branchDy;
+    if (event.reflectedPower > 1e-10) {
+      dom.layerRays.append(svgNode('path', {
+        class: 'layer-reflection-ray',
+        d: `M ${fixed(impact.x, 2)} ${fixed(impact.y, 2)} L ${fixed(impact.x + branchDx, 2)} ${fixed(impact.y - branchDy, 2)}`,
+        opacity: fixed(Math.max(0.24, Math.sqrt(event.reflectedPower)), 3),
+      }));
+    }
+    if (event.atCritical) {
+      dom.layerRays.append(svgNode('path', {
+        class: 'layer-grazing-ray',
+        d: `M ${fixed(impact.x, 2)} ${fixed(impact.y, 2)} L ${fixed(Math.min(870, impact.x + Math.max(70, geometry.layerHeight)), 2)} ${fixed(impact.y, 2)}`,
+      }));
+    }
+    dom.layerRays.append(svgNode('circle', {
+      class: `layer-impact${event.totalInternalReflection ? ' tir' : ''}`,
+      cx: fixed(impact.x, 2), cy: fixed(impact.y, 2), r: event.totalInternalReflection ? 8 : 5,
+    }));
+    if (event.totalInternalReflection || event.atCritical) {
+      dom.layerRays.append(svgNode('text', {
+        class: 'layer-ray-label', x: fixed(Math.min(760, impact.x + 15), 2), y: fixed(impact.y - 13, 2),
+      }, event.totalInternalReflection ? `界面 ${event.label}：全反射` : `界面 ${event.label}：臨界角`));
+    }
+  });
+}
+
+function layerEventState(event) {
+  if (!event.reached) return { key: 'blocked', text: `未抵達（在 ${event.blockedBy} 停止）` };
+  if (event.totalInternalReflection) return { key: 'tir', text: '全反射' };
+  if (event.atCritical) return { key: 'critical', text: '臨界狀態：沿界面' };
+  if (event.bending === 'toward-normal') return { key: 'pass', text: '折射：向法線' };
+  if (event.bending === 'away-from-normal') return { key: 'pass', text: '折射：離法線' };
+  return { key: 'pass', text: '直線通過' };
+}
+
+function renderLayerTable(trace) {
+  dom.layerEventBody.replaceChildren();
+  trace.events.forEach((event) => {
+    const stateCopy = layerEventState(event);
+    const row = document.createElement('tr');
+    row.dataset.interface = event.label;
+    row.dataset.state = stateCopy.key;
+    const heading = document.createElement('th');
+    heading.scope = 'row';
+    heading.textContent = event.label;
+    const cells = [
+      `${fixed(event.n1, 3)} → ${fixed(event.n2, 3)}`,
+      event.reached ? `θᵢ ${fixed(event.incidentDeg)}° → ${event.refractedDeg === null ? '—' : `θₜ ${fixed(event.refractedDeg)}°`}` : '—',
+      stateCopy.text,
+      event.reached ? `反射 ${fixed(event.reflectedPower * 100, 2)}% ／ 向下 ${fixed(event.transmittedPower * 100, 2)}%` : '—',
+    ].map((text) => {
+      const cell = document.createElement('td');
+      cell.textContent = text;
+      return cell;
+    });
+    row.append(heading, ...cells);
+    dom.layerEventBody.append(row);
+  });
+}
+
+function renderLayerLab(nextState, trace, { announce = true } = {}) {
+  const geometry = layerGeometry(trace);
+  renderLayerBackgrounds(trace, geometry);
+  renderLayerRays(trace, geometry);
+  renderLayerTable(trace);
+
+  dom.layerAngle.value = String(nextState.angle);
+  dom.layerAngleOutput.value = `${fixed(nextState.angle)}°`;
+  dom.layerAngle.setAttribute('aria-valuetext', `${fixed(nextState.angle)} 度`);
+  dom.layerInvariant.textContent = fixed(trace.invariant, 3);
+  dom.layerReflectedTotal.textContent = `${fixed(trace.totalReflectedPower * 100, 2)}%`;
+  dom.layerExitPower.textContent = `${fixed(trace.exitPower * 100, 2)}%`;
+
+  let kind = 'pass';
+  let title = '穿過六個界面';
+  let explanation = `主光線抵達介質 7，最下方輸出為最初能量的 ${fixed(trace.exitPower * 100, 2)}%。`;
+  if (trace.termination === 'total-internal-reflection') {
+    kind = 'tir';
+    title = `界面 ${trace.terminatedAt} 發生全反射`;
+    const event = trace.events.find((entry) => entry.label === trace.terminatedAt);
+    explanation = `入射角 ${fixed(event.incidentDeg, 2)}° 大於臨界角 ${fixed(event.criticalDeg, 2)}°，主光線不再抵達下方界面。`;
+  } else if (trace.termination === 'grazing') {
+    kind = 'critical';
+    title = `界面 ${trace.terminatedAt} 達到臨界角`;
+    explanation = '折射角為 90°，光沿界面前進，因此不會抵達下一個平行界面。';
+  }
+  dom.layerResultBanner.dataset.kind = kind;
+  dom.layerResultTitle.textContent = title;
+  dom.layerResultExplanation.textContent = explanation;
+  dom.layerSceneDesc.textContent = `光以 ${fixed(nextState.angle)} 度由介質 1 向下入射。${title}。${explanation}`;
+
+  if (announce) {
+    clearTimeout(layerAnnounceTimer);
+    layerAnnounceTimer = window.setTimeout(() => { dom.layerLive.textContent = `${title}。${explanation}`; }, 120);
+  }
+}
+
+function readLayerIndices() {
+  return dom.layerInputs.map((input, index) => {
+    const value = Number(input.value);
+    const invalid = input.value.trim() === '' || !input.validity.valid || !Number.isFinite(value) || value < 1 || value > 3;
+    input.setAttribute('aria-invalid', String(invalid));
+    if (invalid) throw new RangeError(`介質 ${index + 1} 請輸入 1.000 到 3.000`);
+    return value;
+  });
+}
+
+function commitLayerControls(options = {}) {
+  clearTimeout(layerAnnounceTimer);
+  try {
+    const indices = Object.freeze(readLayerIndices());
+    const angle = Number(dom.layerAngle.value);
+    const trace = traceLayerStack({ indices: [...indices], incidentDeg: angle });
+    layerState = Object.freeze({ indices, angle });
+    layerSnapshot = trace;
+    dom.layerValidation.textContent = '';
+    renderLayerLab(layerState, layerSnapshot, options);
+    return true;
+  } catch (error) {
+    dom.layerValidation.textContent = error instanceof Error ? error.message : '六界面輸入值無效';
+    return false;
+  }
+}
+
+function setLayerPreset(name) {
+  const preset = LAYER_PRESETS[name];
+  if (!preset) return false;
+  dom.layerInputs.forEach((input, index) => { input.value = fixed(preset.indices[index], 3); });
+  dom.layerAngle.value = String(preset.angle);
+  return commitLayerControls();
+}
+
+function setLayerIndices(values) {
+  if (!Array.isArray(values) || values.length !== 7
+    || values.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 3)) return false;
+  dom.layerInputs.forEach((input, index) => { input.value = String(values[index]); });
+  return commitLayerControls({ announce: false });
+}
+
+function setLayerAngle(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 75) return false;
+  dom.layerAngle.value = String(value);
+  return commitLayerControls({ announce: false });
+}
+
 function scenePoint(event) {
   const point = dom.scene.createSVGPoint();
   point.x = event.clientX;
@@ -329,63 +602,39 @@ dom.source.addEventListener('keydown', (event) => {
   dom.angle.value = String(Math.max(0, Math.min(89.5, angle)));
   commitFromControls();
 });
-window.addEventListener('resize', () => render(state, snapshot, { announce: false }));
-
-dom.reveal.addEventListener('click', () => {
-  const nextHidden = !dom.answer.hidden;
-  dom.answer.hidden = nextHidden;
-  dom.reveal.setAttribute('aria-expanded', String(!nextHidden));
-  dom.reveal.textContent = nextHidden ? '揭曉候選界面' : '收起答案';
-  document.querySelectorAll('[data-boundary]').forEach((button) => {
-    const boundary = layerInterfaces[Number(button.dataset.boundary)];
-    button.classList.toggle('candidate', !nextHidden && boundary.canTir);
-    button.classList.toggle('not-candidate', !nextHidden && !boundary.canTir);
-  });
+window.addEventListener('resize', () => {
+  render(state, snapshot, { announce: false });
+  renderLayerLab(layerState, layerSnapshot, { announce: false });
 });
 
-document.querySelectorAll('[data-boundary]').forEach((button) => {
-  button.addEventListener('click', () => {
-    const index = Number(button.dataset.boundary);
-    const boundary = layerInterfaces[index];
-    if (!boundary) return;
-    dom.topSelect.value = 'custom';
-    dom.bottomSelect.value = 'custom';
-    dom.topCustom.value = String(boundary.n1);
-    dom.bottomCustom.value = String(boundary.n2);
-    let demonstrationAngle = 55;
-    if (boundary.canTir) {
-      const demonstrationInvariant = (boundary.maxInvariant + boundary.n2) / 2;
-      demonstrationAngle = Math.asin(demonstrationInvariant / boundary.n1) * 180 / Math.PI;
-    } else if (boundary.reason === 'path-limited') {
-      demonstrationAngle = boundary.maxIncidentDeg;
-    }
-    dom.angle.value = fixed(Math.min(89.5, demonstrationAngle));
-    state = Object.freeze({ ...state, side: -1 });
-    commitFromControls();
-    if (boundary.canTir) {
-      dom.boundaryLive.textContent = `已載入界面 ${boundary.label}：可抵達此處的 K 最大為 ${fixed(boundary.maxInvariant, 1)}，大於下一層 ${fixed(boundary.n2, 1)}，所以有機會全反射。`;
-    } else if (boundary.reason === 'path-limited') {
-      dom.boundaryLive.textContent = `界面 ${boundary.label} 單看是高到低，但先前最低折射率為 ${fixed(boundary.maxInvariant, 1)}；抵達時最大入射角 ${fixed(boundary.maxIncidentDeg)}° 仍小於臨界角 ${fixed(boundary.criticalDeg)}°。`;
-    } else {
-      dom.boundaryLive.textContent = `已載入界面 ${boundary.label}：${boundary.n1} → ${boundary.n2}，折射率上升，所以不可能全反射。`;
-    }
-    document.querySelectorAll('[data-boundary]').forEach((item) => item.removeAttribute('aria-current'));
-    button.setAttribute('aria-current', 'true');
-  });
+dom.layerAngle.addEventListener('input', () => commitLayerControls({ announce: false }));
+dom.layerAngle.addEventListener('change', () => commitLayerControls());
+dom.layerInputs.forEach((input) => {
+  input.addEventListener('input', () => commitLayerControls());
+  input.addEventListener('change', () => commitLayerControls());
+});
+document.querySelectorAll('[data-layer-preset]').forEach((button) => {
+  button.addEventListener('click', () => setLayerPreset(button.dataset.layerPreset));
 });
 
 syncCustomControls();
 render(state, snapshot, { announce: false });
+renderLayerLab(layerState, layerSnapshot, { announce: false });
 document.body.dataset.appReady = 'true';
 
 const api = Object.freeze({
   get state() { return Object.freeze({ ...state }); },
   get snapshot() { return Object.freeze({ ...snapshot }); },
+  get layerState() { return Object.freeze({ angle: layerState.angle, indices: Object.freeze([...layerState.indices]) }); },
+  get layerSnapshot() { return layerSnapshot; },
   setAngle(value) {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 89.5) return false;
     dom.angle.value = String(value);
     return commitFromControls({ announce: false });
   },
   setPreset,
+  setLayerAngle,
+  setLayerIndices,
+  setLayerPreset,
 });
 Object.defineProperty(window, '__OPTICS_LAB__', { value: api, writable: false, configurable: false });

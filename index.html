@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f0e8">
-  <meta name="description" content="可拖曳光源、自由選擇介質，探索斯涅耳定律、折射、臨界角與全反射。">
+  <meta name="description" content="可調整入射角與介質，探索單一及六個平行界面的反射、折射、臨界角與全反射。">
   <link rel="canonical" href="https://addielu-phy.github.io/optics-interface-lab/">
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
@@ -28,7 +28,7 @@
         <p class="hero-lead">拖動光源、換一組介質，親眼看見光何時靠近法線、何時遠離法線，以及何時乾脆不穿過界面。</p>
         <div class="hero-actions">
           <a class="primary-link" href="#lab">開始實驗 <span aria-hidden="true">↓</span></a>
-          <a class="text-link" href="#layer-challenge">直接挑戰六層介質</a>
+          <a class="text-link" href="#layer-lab">直接操作六界面</a>
         </div>
       </div>
       <div class="hero-orbit" aria-hidden="true">
@@ -215,32 +215,87 @@
       </div>
     </section>
 
-    <section class="challenge-section" id="layer-challenge" aria-labelledby="challenge-title">
-      <div class="challenge-copy">
-        <p class="eyebrow">FROM YOUR QUESTION</p>
-        <h2 id="challenge-title">六層介質，哪些界面「有機會」全反射？</h2>
-        <p>光由最上方 n₁ 射入。因所有界面平行，光在各層中的 <strong>K = n sin θ</strong> 保持不變；因此不能只看眼前兩層，還要確認光能通過前面的每一層。</p>
-        <div class="challenge-tip"><strong>三步判斷：</strong><span>① K 在各層不變</span><span>② 前面每層都要容得下 K</span><span>③ K &gt; 下一層 n 才會全反射</span></div>
-        <button id="reveal-answer" class="reveal-button" type="button" aria-expanded="false" aria-controls="challenge-answer">揭曉候選界面</button>
-        <div id="challenge-answer" class="challenge-answer" hidden>
-          <strong>候選：A、B、E</strong>
-          <p>D 雖是 1.6 → 1.4，但光先穿過 n₃ = 1.3；能抵達 D 的光必有 K ≤ 1.3，不可能大於下一層的 1.4。A、B、E 分別代表不同初始入射角的可能結果；同一束光若先在前面全反射，就不會再抵達後方界面。</p>
+    <section class="multilayer-section" id="layer-lab" aria-labelledby="multilayer-title">
+      <div class="multilayer-heading">
+        <div>
+          <p class="eyebrow">SIX INTERFACES · ONE RAY</p>
+          <h2 id="multilayer-title">六個界面，逐層追蹤光線</h2>
         </div>
-        <p id="boundary-live" class="boundary-live" role="status" aria-live="polite"></p>
+        <p>光由最上方介質向下入射。調整入射角或七層折射率，畫面會依序計算每個已抵達界面的反射、折射、臨界狀態與全反射。</p>
       </div>
 
-      <div class="layer-stack" role="group" aria-label="六層介質示意；點選界面可載入上方實驗">
-        <div class="medium-layer tone-1"><span>n₁</span><strong>1.7</strong></div>
-        <button class="boundary-button" data-boundary="0" type="button"><span>A</span><small>載入界面</small></button>
-        <div class="medium-layer tone-2"><span>n₂</span><strong>1.5</strong></div>
-        <button class="boundary-button" data-boundary="1" type="button"><span>B</span><small>載入界面</small></button>
-        <div class="medium-layer tone-3"><span>n₃</span><strong>1.3</strong></div>
-        <button class="boundary-button" data-boundary="2" type="button"><span>C</span><small>載入界面</small></button>
-        <div class="medium-layer tone-4"><span>n₄</span><strong>1.6</strong></div>
-        <button class="boundary-button" data-boundary="3" type="button"><span>D</span><small>載入界面</small></button>
-        <div class="medium-layer tone-5"><span>n₅</span><strong>1.4</strong></div>
-        <button class="boundary-button" data-boundary="4" type="button"><span>E</span><small>載入界面</small></button>
-        <div class="medium-layer tone-6"><span>n₆</span><strong>1.0</strong></div>
+      <div class="multilayer-shell">
+        <aside class="layer-controls" aria-label="六界面模擬控制">
+          <div class="panel-heading compact"><span class="step-number">01</span><div><strong>調整入射角</strong><small>角度從界面法線量起</small></div></div>
+          <div class="range-heading"><label for="layer-angle-range">最上層入射角</label><output id="layer-angle-output" for="layer-angle-range">30.0°</output></div>
+          <input id="layer-angle-range" class="angle-range" type="range" min="0" max="75" step="0.1" value="30" aria-valuetext="30.0 度">
+          <div class="range-scale"><span>0° 正入射</span><span>75° 大角度</span></div>
+
+          <span class="control-label preset-label">快速觀察</span>
+          <div class="layer-preset-grid">
+            <button type="button" data-layer-preset="through">穿過六界面</button>
+            <button type="button" data-layer-preset="deep-tir">界面 E 全反射</button>
+            <button type="button" data-layer-preset="early-tir">界面 A 全反射</button>
+          </div>
+
+          <div class="divider"></div>
+          <fieldset class="layer-index-fieldset">
+            <legend><strong>七層介質折射率</strong><small>每兩層之間形成一個界面</small></legend>
+            <div class="layer-index-grid">
+              <label><span>介質 1</span><input data-layer-index="0" type="number" min="1" max="3" step="0.001" value="1.700" inputmode="decimal"></label>
+              <label><span>介質 2</span><input data-layer-index="1" type="number" min="1" max="3" step="0.001" value="1.500" inputmode="decimal"></label>
+              <label><span>介質 3</span><input data-layer-index="2" type="number" min="1" max="3" step="0.001" value="1.300" inputmode="decimal"></label>
+              <label><span>介質 4</span><input data-layer-index="3" type="number" min="1" max="3" step="0.001" value="1.600" inputmode="decimal"></label>
+              <label><span>介質 5</span><input data-layer-index="4" type="number" min="1" max="3" step="0.001" value="1.400" inputmode="decimal"></label>
+              <label><span>介質 6</span><input data-layer-index="5" type="number" min="1" max="3" step="0.001" value="1.200" inputmode="decimal"></label>
+              <label><span>介質 7</span><input data-layer-index="6" type="number" min="1" max="3" step="0.001" value="1.000" inputmode="decimal"></label>
+            </div>
+          </fieldset>
+          <p id="layer-validation" class="validation-status" role="status" aria-live="polite"></p>
+          <p class="layer-control-note">可輸入 1.000–3.000。若光在某界面全反射或沿界面前進，便不會抵達更下方的界面。</p>
+        </aside>
+
+        <div class="layer-stage">
+          <div id="layer-result-banner" class="layer-result-banner" data-kind="pass">
+            <span class="result-dot" aria-hidden="true"></span>
+            <div><small>PRIMARY RAY STATUS</small><strong id="layer-result-title">穿過六個界面</strong><p id="layer-result-explanation">主光線抵達最下層；每個界面仍有部分 Fresnel 反射。</p></div>
+          </div>
+
+          <figure class="layer-figure">
+            <svg id="layer-scene" class="layer-scene" viewBox="0 0 900 700" role="group" aria-labelledby="layer-scene-title layer-scene-desc">
+              <title id="layer-scene-title">六個平行界面的光線追蹤圖</title>
+              <desc id="layer-scene-desc">光由上方向下，依序在六個界面發生反射、折射或全反射。</desc>
+              <defs>
+                <marker id="layer-arrow-incident" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L9 4.5 L0 9 Z" fill="#8a6100"/></marker>
+                <marker id="layer-arrow-reflected" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b14435"/></marker>
+                <marker id="layer-arrow-transmitted" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L9 4.5 L0 9 Z" fill="#176f98"/></marker>
+              </defs>
+              <g id="layer-backgrounds"></g>
+              <g id="layer-rays"></g>
+              <g id="layer-annotations"></g>
+            </svg>
+            <figcaption>藍色為向下傳遞的主光線，粉紅色為各界面的第一代反射支線；箭頭表示傳播方向。亮度經增強以利閱讀，能量請以表格數值為準。</figcaption>
+          </figure>
+
+          <div class="layer-metrics" role="group" aria-label="六界面光路摘要">
+            <article><span>不變量 K</span><strong id="layer-invariant">0.850</strong><small>K = n sin θ</small></article>
+            <article><span>累積反射</span><strong id="layer-reflected-total">—</strong><small>各第一代反射能量總和</small></article>
+            <article><span>最下方輸出</span><strong id="layer-exit-power">—</strong><small>相對最初入射能量</small></article>
+          </div>
+
+          <div class="layer-table-wrap" tabindex="0" role="region" aria-label="六個界面的逐層計算結果">
+            <table class="layer-event-table">
+              <thead><tr><th scope="col">界面</th><th scope="col">折射率</th><th scope="col">角度</th><th scope="col">現象</th><th scope="col">反射／穿透能量</th></tr></thead>
+              <tbody id="layer-event-body"></tbody>
+            </table>
+          </div>
+          <p id="layer-live" class="result-live" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="multilayer-model-note">
+        <strong>模型範圍：</strong>
+        <p>沿向下主光線逐界面追蹤，所有已顯示事件皆使用 Snell 定律與未偏振光 Fresnel 能量比例。為避免無限多重反射使畫面失去可讀性，粉紅支線只畫到第一次反射後，未再展開它後續可能產生的次級反射。</p>
       </div>
     </section>
 

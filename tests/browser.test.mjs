@@ -101,11 +101,12 @@ async function assertLayout(page, viewport) {
         };
       });
     const svg = document.getElementById('optics-scene').getBoundingClientRect();
+    const layerSvg = document.getElementById('layer-scene').getBoundingClientRect();
     const overflowers = [...document.querySelectorAll('body *')].map((element) => {
       const rect = element.getBoundingClientRect();
       return { tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: rect.left, right: rect.right, width: rect.width };
     }).filter((item) => item.left < -0.5 || item.right > document.documentElement.clientWidth + 0.5);
-    const orderIds = ['lab', 'layer-challenge'];
+    const orderIds = ['lab', 'layer-lab'];
     const order = orderIds.map((id) => document.getElementById(id).offsetTop);
     return {
       clientWidth: document.documentElement.clientWidth,
@@ -114,6 +115,7 @@ async function assertLayout(page, viewport) {
       visibleSvgText,
       overflowers,
       svg: { width: svg.width, height: svg.height },
+      layerSvg: { width: layerSvg.width, height: layerSvg.height },
       order,
       ready: document.body.dataset.appReady,
     };
@@ -122,7 +124,8 @@ async function assertLayout(page, viewport) {
   assert.equal(geometry.scrollWidth, geometry.clientWidth, `${viewport.name}: horizontal overflow ${JSON.stringify(geometry.overflowers)}`);
   assert.equal(geometry.ready, 'true', `${viewport.name}: app ready sentinel`);
   assert.ok(geometry.svg.width > 200 && geometry.svg.height > 150, `${viewport.name}: SVG has useful dimensions`);
-  assert.ok(geometry.order[1] > geometry.order[0], `${viewport.name}: challenge must follow lab`);
+  assert.ok(geometry.layerSvg.width > 200 && geometry.layerSvg.height > 150, `${viewport.name}: layer SVG has useful dimensions`);
+  assert.ok(geometry.order[1] > geometry.order[0], `${viewport.name}: multilayer lab must follow single-interface lab`);
   const undersized = geometry.interactive.filter((item) => item.height < 43.5 || item.width < 43.5);
   assert.deepEqual(undersized, [], `${viewport.name}: undersized targets ${JSON.stringify(undersized)}`);
   assert.ok(geometry.visibleSvgText.length > 0, `${viewport.name}: no visible SVG teaching text`);
@@ -151,6 +154,8 @@ async function assertAccessibility(page, viewport) {
     const upperDark = document.querySelector('#upper-gradient stop[offset="1"]').getAttribute('stop-color');
     const lowerDark = document.querySelector('#lower-gradient stop[offset="1"]').getAttribute('stop-color');
     const style = (selector, property) => getComputedStyle(document.querySelector(selector))[property];
+    const layerFills = [...document.querySelectorAll('#layer-backgrounds .layer-medium-fill')]
+      .map((rect) => rect.getAttribute('fill'));
     return [
       ['ink/paper', root.getPropertyValue('--ink').trim(), root.getPropertyValue('--paper').trim(), 4.5],
       ['soft/paper', root.getPropertyValue('--ink-soft').trim(), root.getPropertyValue('--paper').trim(), 4.5],
@@ -163,6 +168,12 @@ async function assertAccessibility(page, viewport) {
       ['incident ray/upper', style('#incident-ray', 'stroke'), upperDark, 3],
       ['reflected ray/upper', style('#reflected-ray', 'stroke'), upperDark, 3],
       ['transmitted ray/lower', style('#transmitted-ray', 'stroke'), lowerDark, 3],
+      ...layerFills.flatMap((background, index) => [
+        [`layer text/${index + 1}`, style('.layer-medium-text', 'fill'), background, 4.5],
+        [`layer primary/${index + 1}`, style('.layer-primary-ray', 'stroke'), background, 3],
+        [`layer reflection/${index + 1}`, style('.layer-reflection-ray', 'stroke'), background, 3],
+        [`layer interface/${index + 1}`, style('.layer-interface-line', 'stroke'), background, 3],
+      ]),
     ];
   });
   const measured = contrastPairs.map(([name, foreground, background, minimum]) => ({
@@ -256,29 +267,70 @@ async function runInteractions(page) {
   assert.equal(fiber.n2, 1.46);
   assert.equal(fiber.totalInternalReflection, true);
 
-  await page.locator('[data-boundary="2"]').click();
-  const layerC = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
-  assert.equal(layerC.n1, 1.3);
-  assert.equal(layerC.n2, 1.6);
-  assert.equal(layerC.totalInternalReflection, false);
+  const initialLayerTrace = await page.evaluate(() => window.__OPTICS_LAB__.layerSnapshot);
+  assert.equal(initialLayerTrace.events.length, 6);
+  assert.equal(initialLayerTrace.events.every((event) => event.reached), true);
+  assert.equal(initialLayerTrace.termination, 'exited-bottom');
+  assert.equal(await page.locator('#layer-event-body tr').count(), 6);
+  assert.equal(await page.locator('#layer-scene .layer-interface-line').count(), 6);
 
-  await page.locator('[data-boundary="3"]').click();
-  const layerD = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
-  assert.equal(layerD.n1, 1.6);
-  assert.equal(layerD.n2, 1.4);
-  assert.equal(layerD.totalInternalReflection, false, 'D is path-limited by the earlier n=1.3 layer');
-  assert.match(await page.locator('#boundary-live').textContent(), /先前.*1\.3|最低折射率.*1\.3/);
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerAngle(45)), true);
+  const middleTir = await page.evaluate(() => window.__OPTICS_LAB__.layerSnapshot);
+  assert.equal(middleTir.termination, 'total-internal-reflection');
+  assert.equal(middleTir.terminatedAt, 'E');
+  assert.deepEqual(middleTir.events.filter((event) => event.reached).map((event) => event.label), ['A', 'B', 'C', 'D', 'E']);
+  assert.equal(middleTir.events[5].blockedBy, 'E');
+  assert.equal(await page.locator('#layer-event-body tr[data-interface="E"]').getAttribute('data-state'), 'tir');
+  assert.equal(await page.locator('#layer-event-body tr[data-interface="F"]').getAttribute('data-state'), 'blocked');
+  assert.match(await page.locator('#layer-result-title').textContent(), /界面 E.*全反射/);
 
-  await page.locator('[data-boundary="0"]').click();
-  const layerA = await page.evaluate(() => window.__OPTICS_LAB__.snapshot);
-  assert.equal(layerA.n1, 1.7);
-  assert.equal(layerA.n2, 1.5);
-  assert.equal(layerA.totalInternalReflection, true);
+  await page.locator('[data-layer-preset="early-tir"]').click();
+  const earlyTir = await page.evaluate(() => window.__OPTICS_LAB__.layerSnapshot);
+  assert.equal(earlyTir.terminatedAt, 'A');
 
-  await page.locator('#reveal-answer').click();
-  assert.equal(await page.locator('#challenge-answer').isVisible(), true);
-  assert.match(await page.locator('#challenge-answer').textContent(), /A、B、E/);
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerIndices(Array(7).fill(1.5))), true);
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerAngle(60)), true);
+  const equalStack = await page.evaluate(() => window.__OPTICS_LAB__.layerSnapshot);
+  assert.equal(equalStack.termination, 'exited-bottom');
+  assert.equal(equalStack.events.every((event) => event.reflectedPower === 0), true);
+  assert.equal(equalStack.events.every((event) => event.transmittedPower === 1), true);
 
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerAngle(75)), true);
+  const layerGeometryBounds = await page.locator('#layer-rays').evaluate((group) => {
+    const nodes = [...group.querySelectorAll('path, circle')];
+    return nodes.map((node) => {
+      const box = node.getBBox();
+      return { tag: node.tagName, x: box.x, y: box.y, right: box.x + box.width, bottom: box.y + box.height };
+    });
+  });
+  assert.equal(layerGeometryBounds.every((box) => box.x >= -1 && box.y >= -1 && box.right <= 901 && box.bottom <= 701), true,
+    `75° equal-index layer geometry clipped: ${JSON.stringify(layerGeometryBounds)}`);
+
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerIndices([2, 1, 1, 1, 1, 1, 1])), true);
+  assert.equal(await page.evaluate(() => window.__OPTICS_LAB__.setLayerAngle(30)), true);
+  const criticalLayer = await page.evaluate(() => window.__OPTICS_LAB__.layerSnapshot);
+  assert.equal(criticalLayer.termination, 'grazing');
+  assert.equal(criticalLayer.terminatedAt, 'A');
+  assert.equal(criticalLayer.events[0].atCritical, true);
+  assert.equal(await page.locator('#layer-event-body tr[data-interface="A"]').getAttribute('data-state'), 'critical');
+  assert.match(await page.locator('#layer-result-title').textContent(), /界面 A.*臨界角/);
+
+  const layerPaths = await page.locator('#layer-rays path').evaluateAll((paths) => paths.map((path) => path.getAttribute('d') || ''));
+  assert.equal(layerPaths.some((path) => /NaN|Infinity/.test(path)), false, 'layer ray paths must stay finite');
+
+  const beforeInvalidLayer = await page.evaluate(() => JSON.stringify(window.__OPTICS_LAB__.layerSnapshot));
+  await page.locator('[data-layer-index="3"]').fill('');
+  await page.waitForTimeout(50);
+  const afterInvalidLayer = await page.evaluate(() => JSON.stringify(window.__OPTICS_LAB__.layerSnapshot));
+  assert.equal(afterInvalidLayer, beforeInvalidLayer, 'invalid layer index must retain the last valid trace');
+  assert.notEqual((await page.locator('#layer-validation').textContent()).trim(), '');
+  assert.equal(await page.locator('[data-layer-index="3"]').getAttribute('aria-invalid'), 'true');
+  await page.locator('[data-layer-index="3"]').fill('1.5');
+  await page.waitForTimeout(120);
+  assert.equal((await page.locator('#layer-validation').textContent()).trim(), '');
+
+  await page.locator('#incident-medium').selectOption('custom');
+  await page.locator('#incident-custom').fill('1.7');
   const beforeInvalid = await page.evaluate(() => JSON.stringify(window.__OPTICS_LAB__.snapshot));
   await page.locator('#incident-custom').fill('');
   await page.waitForTimeout(50);
@@ -293,16 +345,40 @@ async function runInteractions(page) {
   const hostile = await page.evaluate(() => {
     const api = window.__OPTICS_LAB__;
     const before = JSON.stringify(api.snapshot);
+    const beforeLayer = JSON.stringify(api.layerSnapshot);
     const values = [NaN, Infinity, -1, 90, '50', null, true, {}, []];
     const results = values.map((value) => {
       try { return api.setAngle(value); } catch { return 'threw'; }
     });
+    const layerAngleResults = [NaN, Infinity, -1, 75.1, '50', null, true, {}, []].map((value) => {
+      try { return api.setLayerAngle(value); } catch { return 'threw'; }
+    });
+    const layerIndexResults = [null, [], [1, 1], Array(7).fill(0.9), Array(7).fill('1.5'), Array(7).fill(NaN)].map((value) => {
+      try { return api.setLayerIndices(value); } catch { return 'threw'; }
+    });
     const descriptor = Object.getOwnPropertyDescriptor(window, '__OPTICS_LAB__');
-    return { before, after: JSON.stringify(api.snapshot), results, frozen: Object.isFrozen(api), descriptor };
+    return {
+      before,
+      after: JSON.stringify(api.snapshot),
+      beforeLayer,
+      afterLayer: JSON.stringify(api.layerSnapshot),
+      results,
+      layerAngleResults,
+      layerIndexResults,
+      badPreset: api.setLayerPreset('missing'),
+      frozen: Object.isFrozen(api),
+      layerFrozen: Object.isFrozen(api.layerSnapshot) && Object.isFrozen(api.layerSnapshot.events),
+      descriptor,
+    };
   });
   assert.deepEqual(hostile.results, Array(9).fill(false));
+  assert.deepEqual(hostile.layerAngleResults, Array(9).fill(false));
+  assert.deepEqual(hostile.layerIndexResults, Array(6).fill(false));
+  assert.equal(hostile.badPreset, false);
   assert.equal(hostile.after, hostile.before);
+  assert.equal(hostile.afterLayer, hostile.beforeLayer);
   assert.equal(hostile.frozen, true);
+  assert.equal(hostile.layerFrozen, true);
   assert.equal(hostile.descriptor.writable, false);
   assert.equal(hostile.descriptor.configurable, false);
 
