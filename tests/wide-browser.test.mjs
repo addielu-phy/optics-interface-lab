@@ -24,19 +24,14 @@ function contrastRatio(colorA, colorB) {
 }
 
 function assertPaletteContrast() {
-  const layerFills = ['#c8e7e5', '#d9ece8', '#eef2db', '#f5e7bd', '#f6d9bc', '#f3c7bb', '#dfd3ea'];
   const textPairs = [
     ['#12363b', '#f2eee5'], ['#12363b', '#fffdf8'],
     ['#486268', '#f2eee5'], ['#486268', '#fffdf8'],
     ['#0d6870', '#f2eee5'], ['#0d6870', '#fffdf8'],
-    ...layerFills.map((fill) => ['#12363b', fill]),
+    ['#000000', '#edf8f5'], ['#fffdf8', '#174a52'],
   ];
-  const graphicPairs = ['#8a6100', '#b14435', '#176f98']
-    .flatMap((ray) => layerFills.map((fill) => [ray, fill]));
   assert.equal(textPairs.every(([foreground, background]) => contrastRatio(foreground, background) >= 4.5), true,
-    'all tested UI and SVG text palette pairs must meet WCAG AA contrast');
-  assert.equal(graphicPairs.every(([foreground, background]) => contrastRatio(foreground, background) >= 3), true,
-    'ray palette colors must retain at least 3:1 contrast against every layer');
+    'all tested UI and refractive-index endpoint text pairs must meet WCAG AA contrast');
   return 'pass';
 }
 
@@ -202,6 +197,37 @@ async function runInteractions(page) {
   assert.equal(directionArrows.every((arrow) => /^url\(#wide-arrow-(incident|transmitted|reflected)\)$/.test(arrow.markerEnd)), true,
     'each rendered light-path direction segment must carry an arrowhead');
 
+  const colorIndices = [1, 1.2, 1.4, 1.7, 2, 2.5, 3];
+  assert.equal(await page.evaluate((indices) => window.__WIDE_OPTICS_LAB__.setIndices(indices), colorIndices), true);
+  const colorSamples = await page.evaluate(() => {
+    const layers = [...document.querySelectorAll('#wide-backgrounds .layer-fill')];
+    const labels = [...document.querySelectorAll('#wide-annotations .medium-label')];
+    return layers.map((layer, index) => ({
+      n: Number(layer.dataset.refractiveIndex),
+      depth: Number(layer.dataset.depth),
+      fill: layer.getAttribute('fill').toLowerCase(),
+      label: labels[index].getAttribute('fill').toLowerCase(),
+    }));
+  });
+  assert.deepEqual(colorSamples.map((sample) => sample.n), colorIndices);
+  assert.equal(colorSamples[0].fill, '#edf8f5');
+  assert.equal(colorSamples.at(-1).fill, '#174a52');
+  assert.equal(colorSamples.every((sample, index) => index === 0
+    || relativeLuminance(sample.fill) < relativeLuminance(colorSamples[index - 1].fill)), true,
+  'higher refractive indices must always render with lower luminance');
+  assert.equal(colorSamples.every((sample, index) => index === 0 || sample.depth > colorSamples[index - 1].depth), true,
+    'the encoded color depth must increase with refractive index');
+  assert.equal(colorSamples.every((sample) => contrastRatio(sample.fill, sample.label) >= 4.5), true,
+    `dynamic medium labels must remain readable: ${JSON.stringify(colorSamples)}`);
+  assert.equal(await page.locator('.index-depth-scale').isVisible(), true, 'the refractive-index color legend must be visible');
+  const haloCounts = await page.evaluate(() => ({
+    halos: document.querySelectorAll('#wide-rays .ray-contrast-halo').length,
+    coloredRays: document.querySelectorAll('#wide-rays .primary-ray, #wide-rays .reflection-ray, #wide-rays .grazing-ray').length,
+  }));
+  assert.deepEqual(haloCounts, { halos: haloCounts.coloredRays, coloredRays: haloCounts.coloredRays },
+    'every colored light path must have a contrast halo');
+  assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setPreset('through')), true);
+
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setAngle(45)), true);
   const deepTir = await page.evaluate(() => window.__WIDE_OPTICS_LAB__.snapshot);
   assert.equal(deepTir.termination, 'total-internal-reflection');
@@ -283,7 +309,8 @@ async function runInteractions(page) {
   assert.equal(hostile.descriptor.configurable, false);
 
   return {
-    multilayerPhysics: 'pass', fixedEntryPoint: 'pass', fixedInterfaceGeometry: 'pass',
+    multilayerPhysics: 'pass', refractiveIndexColorDepth: 'pass', dynamicLabelContrast: 'pass',
+    fixedEntryPoint: 'pass', fixedInterfaceGeometry: 'pass',
     visiblePathArrows: 'pass', directRayDrag: 'pass', keyboard: 'pass',
     proportionalArrowheads: 'pass', invalidStateRetention: 'pass',
   };

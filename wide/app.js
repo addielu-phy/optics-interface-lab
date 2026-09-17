@@ -7,7 +7,7 @@ const PRESETS = Object.freeze({
   'deep-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 45, side: 1 }),
   'early-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 65, side: 1 }),
 });
-const LAYER_COLORS = Object.freeze(['#c8e7e5', '#d9ece8', '#eef2db', '#f5e7bd', '#f6d9bc', '#f3c7bb', '#dfd3ea']);
+const INDEX_COLOR_RANGE = Object.freeze({ low: Object.freeze([237, 248, 245]), high: Object.freeze([23, 74, 82]) });
 const SCENE = Object.freeze({ width: 960, layerTop: 80, layerHeight: 64, entryX: 430 });
 const byId = (id) => document.getElementById(id);
 const dom = Object.freeze({
@@ -43,6 +43,30 @@ let announceTimer = 0;
 
 function fixed(value, digits = 1) {
   return Number(value).toFixed(digits);
+}
+
+function channelHex(value) {
+  return Math.round(value).toString(16).padStart(2, '0');
+}
+
+function srgbLuminance(rgb) {
+  const [red, green, blue] = rgb
+    .map((channel) => channel / 255)
+    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function indexAppearance(index) {
+  const position = Math.max(0, Math.min(1, (index - 1) / 2));
+  const rgb = INDEX_COLOR_RANGE.low.map((start, channel) => Math.round(
+    start + (INDEX_COLOR_RANGE.high[channel] - start) * position
+  ));
+  const fill = `#${rgb.map(channelHex).join('')}`;
+  return Object.freeze({
+    fill,
+    label: srgbLuminance(rgb) > 0.179 ? '#000000' : '#fffdf8',
+    position,
+  });
 }
 
 function svgNode(name, attributes = {}, text = '') {
@@ -132,6 +156,15 @@ function appendDirectionArrow(from, to, kind, opacity = 1) {
   }));
 }
 
+function appendContrastHalo(from, to, opacity = 0.82) {
+  dom.rays.append(svgNode('path', {
+    class: 'ray-contrast-halo',
+    d: pathData(from, to),
+    opacity,
+    'aria-hidden': 'true',
+  }));
+}
+
 function renderBackgrounds(trace, geometry) {
   dom.backgrounds.replaceChildren();
   dom.annotations.replaceChildren();
@@ -139,26 +172,35 @@ function renderBackgrounds(trace, geometry) {
 
   trace.indices.forEach((n, index) => {
     const y = geometry.topY + index * geometry.layerHeight;
+    const appearance = indexAppearance(n);
     dom.backgrounds.append(svgNode('rect', {
       class: 'layer-fill', x: 0, y: fixed(y, 2), width: SCENE.width,
-      height: fixed(geometry.layerHeight, 2), fill: LAYER_COLORS[index],
+      height: fixed(geometry.layerHeight, 2), fill: appearance.fill,
+      'data-refractive-index': fixed(n, 3), 'data-depth': fixed(appearance.position, 3),
     }));
     if (showLabels) {
       dom.annotations.append(svgNode('text', {
         class: 'medium-label', x: 16, y: fixed(y + geometry.layerHeight * 0.58, 2),
+        fill: appearance.label, 'data-label-tone': appearance.label === '#000000' ? 'dark' : 'light',
       }, `介質 ${index + 1}　n = ${fixed(n, 3)}`));
     }
   });
 
   trace.events.forEach((event, index) => {
     const y = geometry.topY + (index + 1) * geometry.layerHeight;
+    const lineCoordinates = { x1: 0, y1: fixed(y, 2), x2: SCENE.width, y2: fixed(y, 2) };
+    dom.backgrounds.append(svgNode('line', {
+      class: `interface-line-halo${event.reached ? '' : ' blocked'}`,
+      ...lineCoordinates,
+    }));
     dom.backgrounds.append(svgNode('line', {
       class: `interface-line${event.reached ? '' : ' blocked'}`,
-      x1: 0, y1: fixed(y, 2), x2: SCENE.width, y2: fixed(y, 2),
+      ...lineCoordinates,
     }));
     if (showLabels) {
+      const appearance = indexAppearance(trace.indices[index]);
       dom.annotations.append(svgNode('text', {
-        class: 'interface-label', x: 879, y: fixed(y - 7, 2),
+        class: 'interface-label', x: 879, y: fixed(y - 7, 2), fill: appearance.label,
       }, `界面 ${event.label}`));
     }
   });
@@ -203,6 +245,7 @@ function renderRays(trace, geometry, nextState) {
     }
     const opacity = fixed(Math.max(.28, Math.sqrt(Math.max(0, incomingPower))), 3);
     const kind = index === 1 ? 'incident' : 'transmitted';
+    appendContrastHalo(from, to);
     dom.rays.append(svgNode('path', {
       id: index === 1 ? 'wide-incident-ray' : '',
       class: `primary-ray${index === 1 ? ' incident' : ''}`,
@@ -219,6 +262,7 @@ function renderRays(trace, geometry, nextState) {
     if (event.reflectedPower > 1e-10) {
       const reflectedEnd = { x: impact.x + branchDx, y: impact.y - branchDy };
       const opacity = fixed(Math.max(.28, Math.sqrt(event.reflectedPower)), 3);
+      appendContrastHalo(impact, reflectedEnd, 0.58);
       dom.rays.append(svgNode('path', {
         class: 'reflection-ray',
         d: pathData(impact, reflectedEnd),
@@ -231,6 +275,7 @@ function renderRays(trace, geometry, nextState) {
         x: Math.max(36, Math.min(924, impact.x + nextState.side * Math.max(76, geometry.layerHeight * 1.25))),
         y: impact.y,
       };
+      appendContrastHalo(impact, grazingEnd);
       dom.rays.append(svgNode('path', {
         class: 'grazing-ray',
         d: pathData(impact, grazingEnd),

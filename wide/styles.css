@@ -180,6 +180,9 @@ a { color: inherit; }
 }
 .wide-presets button:hover, .wide-presets button[aria-pressed="true"] { border-color: var(--teal); background: #e4f1ef; }
 .control-help { margin: -2px 0 8px; color: var(--ink-soft); font-size: .68rem; }
+.index-depth-scale { margin: 0 0 10px; }
+.index-depth-scale > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-soft); font-size: .62rem; font-weight: 850; }
+.index-depth-bar { display: block; height: 12px; margin-top: 4px; border: 1px solid #61777a; border-radius: 999px; background: linear-gradient(90deg, #edf8f5 0%, #174a52 100%); }
 .wide-index-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .wide-index-grid label {
   min-width: 0;
@@ -274,12 +277,14 @@ a { color: inherit; }
 .wide-scene { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; max-height: min(64vh, 650px); touch-action: none; user-select: none; }
 .scene-base { fill: #eef1ed; }
 .layer-fill { stroke: none; }
-.interface-line { stroke: #24484d; stroke-width: 2.4; }
+.interface-line-halo { stroke: rgba(255,253,248,.9); stroke-width: 5; }
+.interface-line { stroke: #173f44; stroke-width: 2.4; }
+.interface-line-halo.blocked { stroke-dasharray: 9 8; opacity: .58; }
 .interface-line.blocked { stroke: #718589; stroke-dasharray: 9 8; opacity: .5; }
-.medium-label, .interface-label, .ray-label, .angle-label, .drag-label { font-family: "Microsoft JhengHei", sans-serif; fill: #173f44; font-weight: 900; }
+.medium-label, .interface-label, .ray-label, .angle-label, .drag-label { font-family: "Microsoft JhengHei", sans-serif; font-weight: 900; }
 .medium-label { font-size: 17px; }
 .interface-label { font-size: 15px; }
-.ray-label { font-size: 14px; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; stroke-linejoin: round; }
+.ray-label { fill: #173f44; font-size: 14px; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; stroke-linejoin: round; }
 .angle-label { font-size: 16px; fill: #765000; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; }
 .drag-label { font-size: 14px; fill: #765000; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; }
 .primary-ray, .reflection-ray, .grazing-ray, .direction-arrow, .angle-arc { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -291,6 +296,7 @@ a { color: inherit; }
 .direction-arrow.incident { stroke: #8a6100; stroke-width: 5.5; }
 .direction-arrow.transmitted { stroke: var(--blue); stroke-width: 5.5; }
 .direction-arrow.reflected { stroke: var(--coral); stroke-width: 4.5; }
+.ray-contrast-halo { fill: none; stroke: rgba(255,253,248,.94); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .ray-glow { fill: none; stroke: #f4cb55; stroke-width: 14; opacity: .12; filter: url(#wide-ray-glow); }
 .impact { fill: #fffdf8; stroke: #173f44; stroke-width: 2.5; }
 .impact.tir { fill: var(--yellow); stroke: #8a6100; stroke-width: 4; }
