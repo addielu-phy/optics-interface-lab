@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test tests/optics.test.mjs",
     "serve": "node scripts/serve.mjs",
-    "qa": "node tests/browser.test.mjs",
+    "qa": "node tests/browser.test.mjs && node tests/six-interface-page.test.mjs",
     "qa:wide": "node tests/wide-browser.test.mjs",
     "verify": "npm test && npm run qa && npm run qa:wide"
   },

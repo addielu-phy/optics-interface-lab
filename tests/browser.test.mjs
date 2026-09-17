@@ -102,6 +102,11 @@ async function assertLayout(page, viewport) {
       });
     const svg = document.getElementById('optics-scene').getBoundingClientRect();
     const layerSvg = document.getElementById('layer-scene').getBoundingClientRect();
+    const layerMarkers = [...document.querySelectorAll('#layer-scene marker')].map((marker) => ({
+      units: marker.getAttribute('markerUnits'),
+      width: Number(marker.getAttribute('markerWidth')),
+      height: Number(marker.getAttribute('markerHeight')),
+    }));
     const overflowers = [...document.querySelectorAll('body *')].map((element) => {
       const rect = element.getBoundingClientRect();
       return { tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: rect.left, right: rect.right, width: rect.width };
@@ -116,6 +121,7 @@ async function assertLayout(page, viewport) {
       overflowers,
       svg: { width: svg.width, height: svg.height },
       layerSvg: { width: layerSvg.width, height: layerSvg.height },
+      layerMarkers,
       order,
       ready: document.body.dataset.appReady,
     };
@@ -125,6 +131,9 @@ async function assertLayout(page, viewport) {
   assert.equal(geometry.ready, 'true', `${viewport.name}: app ready sentinel`);
   assert.ok(geometry.svg.width > 200 && geometry.svg.height > 150, `${viewport.name}: SVG has useful dimensions`);
   assert.ok(geometry.layerSvg.width > 200 && geometry.layerSvg.height > 150, `${viewport.name}: layer SVG has useful dimensions`);
+  assert.equal(geometry.layerMarkers.length, 3, `${viewport.name}: directional markers`);
+  assert.equal(geometry.layerMarkers.every((marker) => marker.units === 'userSpaceOnUse'), true, `${viewport.name}: arrowheads must not scale with stroke width`);
+  assert.equal(geometry.layerMarkers.every((marker) => marker.width <= 16 && marker.height <= 16), true, `${viewport.name}: arrowheads must stay proportional`);
   assert.ok(geometry.order[1] > geometry.order[0], `${viewport.name}: multilayer lab must follow single-interface lab`);
   const undersized = geometry.interactive.filter((item) => item.height < 43.5 || item.width < 43.5);
   assert.deepEqual(undersized, [], `${viewport.name}: undersized targets ${JSON.stringify(undersized)}`);

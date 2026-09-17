@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f0e8">
+  <meta name="description" content="由上往下追蹤一條光線穿越六個平行界面；即時調整入射角與七層介質折射率。">
+  <link rel="canonical" href="https://addielu-phy.github.io/optics-interface-lab/six-interface.html">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>六界面光路實驗｜光的界面實驗室</title>
+</head>
+<body class="six-interface-page">
+  <a class="skip-link" href="#main-content">跳到主要內容</a>
+  <header class="site-header standalone-header">
+    <a class="brand" href="./" aria-label="回到光的界面實驗室首頁">
+      <span class="brand-mark" aria-hidden="true">↘</span>
+      <span>光的界面實驗室</span>
+    </a>
+    <a class="course-tag standalone-back" href="./">返回單界面實驗</a>
+  </header>
+
+  <main id="main-content">
+    <section class="standalone-hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">SIX INTERFACES · LIVE RAY PATH</p>
+        <h1 id="page-title">手調角度，<br><span>立刻看見六界面光路</span></h1>
+      </div>
+      <p>先拉動入射角，正下方光路會同步改變。再往下調整七層折射率，觀察反射、折射、臨界角與全反射如何逐層發生。</p>
+    </section>
+
+    <section class="standalone-lab-section" aria-labelledby="lab-title">
+      <div class="standalone-lab-shell">
+        <div id="standalone-angle-panel" class="standalone-angle-panel">
+          <div class="panel-heading compact">
+            <span class="step-number">01</span>
+            <div><strong id="lab-title">先改變入射角</strong><small>角度從界面法線量起；光路立即更新</small></div>
+          </div>
+          <div class="range-heading">
+            <label for="layer-angle-range">最上層入射角</label>
+            <output id="layer-angle-output" for="layer-angle-range">30.0°</output>
+          </div>
+          <input id="layer-angle-range" class="angle-range" type="range" min="0" max="75" step="0.1" value="30" aria-valuetext="30.0 度">
+          <div class="range-scale" aria-hidden="true"><span>0° 正入射</span><span>75° 大角度</span></div>
+        </div>
+
+        <div id="layer-result-banner" class="layer-result-banner standalone-result-banner" data-kind="pass">
+          <span class="result-dot" aria-hidden="true"></span>
+          <div><small>PRIMARY RAY STATUS</small><strong id="layer-result-title">穿過六個界面</strong><p id="layer-result-explanation">主光線抵達最下層；每個界面仍有部分 Fresnel 反射。</p></div>
+        </div>
+
+        <figure id="standalone-ray-result" class="layer-figure standalone-ray-result">
+          <svg id="layer-scene" class="layer-scene" viewBox="0 0 900 700" role="group" aria-labelledby="layer-scene-title layer-scene-desc">
+            <title id="layer-scene-title">六個平行界面的光線追蹤圖</title>
+            <desc id="layer-scene-desc">光由上方向下，依序在六個界面發生反射、折射或全反射。</desc>
+            <defs>
+              <marker id="layer-arrow-incident" viewBox="0 0 14 14" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L13 7 L1 13 Z" fill="#8a6100"/></marker>
+              <marker id="layer-arrow-reflected" viewBox="0 0 14 14" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L13 7 L1 13 Z" fill="#b14435"/></marker>
+              <marker id="layer-arrow-transmitted" viewBox="0 0 14 14" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L13 7 L1 13 Z" fill="#176f98"/></marker>
+            </defs>
+            <g id="layer-backgrounds"></g>
+            <g id="layer-rays"></g>
+            <g id="layer-annotations"></g>
+          </svg>
+          <figcaption>藍色為向下主光線，粉紅色為各界面的第一代反射支線；小箭頭只標示傳播方向。亮度經增強以利閱讀，能量請以數值為準。</figcaption>
+        </figure>
+
+        <div class="layer-metrics standalone-metrics" role="group" aria-label="六界面光路摘要">
+          <article><span>不變量 K</span><strong id="layer-invariant">0.850</strong><small>K = n sin θ</small></article>
+          <article><span>累積反射</span><strong id="layer-reflected-total">—</strong><small>相對最初入射能量</small></article>
+          <article><span>最下方輸出</span><strong id="layer-exit-power">—</strong><small>相對最初入射能量</small></article>
+        </div>
+
+        <section id="standalone-medium-settings" class="standalone-medium-settings" aria-labelledby="medium-settings-title">
+          <div class="standalone-presets">
+            <div class="panel-heading compact"><span class="step-number">02</span><div><strong id="medium-settings-title">換一組介質</strong><small>也可以先用情境按鈕快速觀察</small></div></div>
+            <div class="layer-preset-grid" role="group" aria-label="六界面情境預設">
+              <button type="button" data-layer-preset="through">穿過六界面</button>
+              <button type="button" data-layer-preset="deep-tir">界面 E 全反射</button>
+              <button type="button" data-layer-preset="early-tir">界面 A 全反射</button>
+            </div>
+            <p class="layer-control-note">若光在某界面全反射或沿界面前進，便不會抵達更下方的界面。</p>
+          </div>
+
+          <fieldset class="layer-index-fieldset standalone-index-fieldset">
+            <legend><strong>七層介質折射率</strong><small>每兩層之間形成一個界面；可輸入 1.000–3.000</small></legend>
+            <div class="layer-index-grid standalone-index-grid">
+              <label><span>介質 1</span><input data-layer-index="0" type="number" min="1" max="3" step="0.001" value="1.700" inputmode="decimal"></label>
+              <label><span>介質 2</span><input data-layer-index="1" type="number" min="1" max="3" step="0.001" value="1.500" inputmode="decimal"></label>
+              <label><span>介質 3</span><input data-layer-index="2" type="number" min="1" max="3" step="0.001" value="1.300" inputmode="decimal"></label>
+              <label><span>介質 4</span><input data-layer-index="3" type="number" min="1" max="3" step="0.001" value="1.600" inputmode="decimal"></label>
+              <label><span>介質 5</span><input data-layer-index="4" type="number" min="1" max="3" step="0.001" value="1.400" inputmode="decimal"></label>
+              <label><span>介質 6</span><input data-layer-index="5" type="number" min="1" max="3" step="0.001" value="1.200" inputmode="decimal"></label>
+              <label><span>介質 7</span><input data-layer-index="6" type="number" min="1" max="3" step="0.001" value="1.000" inputmode="decimal"></label>
+            </div>
+          </fieldset>
+          <p id="layer-validation" class="validation-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="standalone-table-section" aria-labelledby="table-title">
+          <div class="standalone-section-heading"><strong id="table-title">六個界面的逐層結果</strong><span>能量皆相對最初入射光</span></div>
+          <div class="layer-table-wrap" tabindex="0" role="region" aria-label="六個界面的逐層計算結果">
+            <table class="layer-event-table">
+              <thead><tr><th scope="col">界面</th><th scope="col">折射率</th><th scope="col">角度</th><th scope="col">現象</th><th scope="col">反射／向下能量</th></tr></thead>
+              <tbody id="layer-event-body"></tbody>
+            </table>
+          </div>
+        </section>
+        <p id="layer-live" class="result-live" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="multilayer-model-note standalone-model-note">
+        <strong>模型範圍：</strong>
+        <p>沿向下主光線逐界面追蹤，使用 Snell 定律與未偏振光 Fresnel 能量比例。粉紅支線只畫第一次反射，不展開無限多重反射；相位、同調、薄膜干涉、受挫全反射、吸收、散射、表面粗糙與色散不在此幾何光學模型中。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer><p>給課堂預測、操作與驗證使用。</p><a href="./">回到完整實驗室</a></footer>
+  <script type="module" src="./src/six-interface-app.js"></script>
+</body>
+</html>
