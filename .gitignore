@@ -1,5 +1,6 @@
 node_modules/
 qa-artifacts/
+qa-artifacts-wide/
 playwright-report/
 test-results/
 .DS_Store

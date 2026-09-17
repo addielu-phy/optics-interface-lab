@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2eee5">
+  <meta name="description" content="專為筆電與平板設計的六界面即時光路實驗室，可直接拖曳入射光改變角度，觀察逐層折射與全反射。">
+  <link rel="canonical" href="https://addielu-phy.github.io/optics-interface-lab/wide/">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>六界面即時光路｜筆電・平板版</title>
+</head>
+<body>
+  <a class="skip-link" href="#wide-stage">跳到光路畫面</a>
+  <header class="wide-header">
+    <a class="wide-brand" href="../" aria-label="回到光的界面實驗室首頁">
+      <span class="wide-brand-mark" aria-hidden="true">↘</span>
+      <span><strong>六界面即時光路</strong><small>光的界面實驗室</small></span>
+    </a>
+    <div class="wide-header-actions">
+      <span class="device-badge">筆電・平板版</span>
+      <a href="../#layer-lab">原始完整版</a>
+    </div>
+  </header>
+
+  <main class="wide-workspace">
+    <aside class="wide-controls" aria-label="六界面實驗控制台">
+      <div class="control-intro">
+        <p class="eyebrow">DIRECT RAY CONTROL</p>
+        <h1>拖曳光線，<br>立即看見每次偏折</h1>
+        <p>按住右側圖中的<strong>入射光線或圓形光源</strong>拖動，即可改變角度；每個界面的折射、反射與全反射會同步更新。</p>
+      </div>
+
+      <section class="control-card angle-card" aria-labelledby="angle-heading">
+        <div class="control-card-heading">
+          <div><span>01</span><h2 id="angle-heading">入射方向</h2></div>
+          <output id="wide-angle-output" for="wide-angle-range">30.0°</output>
+        </div>
+        <label class="sr-only" for="wide-angle-range">最上層入射角</label>
+        <input id="wide-angle-range" class="angle-range" type="range" min="0" max="75" step="0.1" value="30" aria-valuetext="30.0 度">
+        <div class="range-scale" aria-hidden="true"><span>0° 正入射</span><span>75° 大角度</span></div>
+        <p class="drag-note"><span aria-hidden="true">↔</span> 滑鼠、觸控筆與手指皆可直接拖曳光線</p>
+      </section>
+
+      <section class="control-card" aria-labelledby="preset-heading">
+        <div class="control-card-heading compact">
+          <div><span>02</span><h2 id="preset-heading">快速觀察</h2></div>
+        </div>
+        <div class="wide-presets" role="group" aria-label="光路預設">
+          <button type="button" data-wide-preset="through">穿過六界面</button>
+          <button type="button" data-wide-preset="deep-tir">界面 E 全反射</button>
+          <button type="button" data-wide-preset="early-tir">界面 A 全反射</button>
+        </div>
+      </section>
+
+      <section class="control-card index-card" aria-labelledby="index-heading">
+        <div class="control-card-heading compact">
+          <div><span>03</span><h2 id="index-heading">七層折射率</h2></div>
+        </div>
+        <p class="control-help">每兩層之間形成一個界面；可輸入 1.000–3.000。</p>
+        <div class="wide-index-grid">
+          <label><span>介質 1</span><input data-wide-index="0" type="number" min="1" max="3" step="0.001" value="1.700" inputmode="decimal"></label>
+          <label><span>介質 2</span><input data-wide-index="1" type="number" min="1" max="3" step="0.001" value="1.500" inputmode="decimal"></label>
+          <label><span>介質 3</span><input data-wide-index="2" type="number" min="1" max="3" step="0.001" value="1.300" inputmode="decimal"></label>
+          <label><span>介質 4</span><input data-wide-index="3" type="number" min="1" max="3" step="0.001" value="1.600" inputmode="decimal"></label>
+          <label><span>介質 5</span><input data-wide-index="4" type="number" min="1" max="3" step="0.001" value="1.400" inputmode="decimal"></label>
+          <label><span>介質 6</span><input data-wide-index="5" type="number" min="1" max="3" step="0.001" value="1.200" inputmode="decimal"></label>
+          <label><span>介質 7</span><input data-wide-index="6" type="number" min="1" max="3" step="0.001" value="1.000" inputmode="decimal"></label>
+        </div>
+        <p id="wide-validation" class="validation-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <details class="model-note">
+        <summary>模型與顯示範圍</summary>
+        <p>平行、平坦、均勻且無吸收的透明介質；使用 Snell 定律及未偏振光 Fresnel 能量比例。粉紅色只畫第一代反射，未展開無限多重反射。亮度為閱讀增強，數值以結果卡為準。</p>
+      </details>
+    </aside>
+
+    <section id="wide-stage" class="wide-stage" aria-labelledby="stage-title">
+      <div id="wide-result-banner" class="wide-result-banner" data-kind="pass">
+        <span class="status-light" aria-hidden="true"></span>
+        <div>
+          <small>PRIMARY RAY STATUS</small>
+          <h2 id="stage-title">穿過六個界面</h2>
+          <p id="wide-result-explanation">主光線抵達介質 7；每個界面仍有部分 Fresnel 反射。</p>
+        </div>
+        <div class="live-angle"><span>θ₁</span><strong id="wide-angle-chip">30.0°</strong></div>
+      </div>
+
+      <figure class="wide-figure">
+        <div class="figure-toolbar" aria-hidden="true">
+          <span><i class="legend incident"></i>入射</span>
+          <span><i class="legend transmitted"></i>向下主光線</span>
+          <span><i class="legend reflected"></i>第一代反射</span>
+          <span class="drag-callout">按住入射光拖曳 ↔</span>
+        </div>
+        <svg id="wide-scene" class="wide-scene" viewBox="0 0 960 640" role="group" aria-labelledby="wide-scene-title wide-scene-desc">
+          <title id="wide-scene-title">可直接拖曳入射光的六界面折射與全反射圖</title>
+          <desc id="wide-scene-desc">光以三十度由介質一向下入射，穿過六個平行界面。</desc>
+          <defs>
+            <marker id="wide-arrow-incident" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1.5 L9 5 L1 8.5 Z" fill="#8a6100"/></marker>
+            <marker id="wide-arrow-transmitted" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1.5 L9 5 L1 8.5 Z" fill="#176f98"/></marker>
+            <marker id="wide-arrow-reflected" markerWidth="9" markerHeight="9" refX="7.7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1.4 L8.3 4.5 L1 7.6 Z" fill="#b14435"/></marker>
+            <filter id="wide-ray-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>
+          </defs>
+          <rect class="scene-base" width="960" height="640" rx="10"/>
+          <g id="wide-backgrounds"></g>
+          <g id="wide-rays"></g>
+          <g id="wide-annotations"></g>
+          <path id="wide-incident-hit" class="incident-hit" d="" tabindex="0" role="slider" aria-label="可拖曳入射光線；方向鍵調整入射角" aria-valuemin="0" aria-valuemax="75" aria-valuenow="30" aria-valuetext="入射角 30.0 度"></path>
+          <g id="wide-source-handle" class="source-handle" tabindex="0" role="slider" aria-label="可拖曳光源；方向鍵調整入射角" aria-valuemin="0" aria-valuemax="75" aria-valuenow="30" aria-valuetext="入射角 30.0 度">
+            <circle id="wide-source-touch" class="source-touch" r="26"></circle>
+            <circle class="source-ring" r="13"></circle>
+            <circle class="source-core" r="5"></circle>
+          </g>
+        </svg>
+        <figcaption>角度從界面法線量起。光在全反射或臨界狀態後不會抵達更下方的平行界面；箭頭只表示傳播方向。</figcaption>
+      </figure>
+
+      <div class="wide-metrics" role="group" aria-label="即時計算摘要">
+        <article><span>不變量</span><strong id="wide-invariant">0.850</strong><small>K = n sin θ</small></article>
+        <article><span>累積第一代反射</span><strong id="wide-reflected-total">6.69%</strong><small>相對最初入射能量</small></article>
+        <article><span>最下方輸出</span><strong id="wide-exit-power">93.31%</strong><small>抵達介質 7 的比例</small></article>
+      </div>
+
+      <section class="event-section" aria-labelledby="event-heading">
+        <div class="event-heading"><h2 id="event-heading">各界面即時結果</h2><span>角度與能量同步更新</span></div>
+        <div id="wide-events" class="event-grid"></div>
+      </section>
+      <p id="wide-live" class="sr-only" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

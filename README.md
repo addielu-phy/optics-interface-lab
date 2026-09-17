@@ -4,6 +4,8 @@
 
 **公開網頁：** https://addielu-phy.github.io/optics-interface-lab/
 
+**筆電・平板左右並列版：** https://addielu-phy.github.io/optics-interface-lab/wide/
+
 ## 教學功能
 
 - 入射角可在 `0°–89.5°` 之間連續調整，也可直接拖曳圖中的光源。
@@ -14,6 +16,7 @@
 - 逐界面列出入射角、折射角、現象及相對最初入射光的反射／向下穿透能量；全反射後的下方界面會明確標為「未抵達」。
 - 使用跨層不變量 `K = n sin θ`，確保所有平行界面的角度互相一致，而非把每個界面視為彼此無關。
 - 鍵盤、觸控與滑鼠皆可操作；支援行動裝置與 reduced-motion 偏好。
+- 獨立的筆電／平板版固定保留控制台與光路圖左右並列，並可直接按住入射光線或光源拖曳角度；箭頭採固定尺寸，不會再隨線寬放大。
 
 ## 科學模型
 
@@ -49,6 +52,7 @@ npm run serve
 ```bash
 npm test
 npm run qa
+npm run qa:wide
 npm run verify
 ```
 

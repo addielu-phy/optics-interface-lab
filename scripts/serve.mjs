@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
+import { extname, isAbsolute, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '..'));
@@ -17,11 +17,19 @@ const mime = {
   '.xml': 'application/xml; charset=utf-8',
 };
 
+function isInsideRoot(candidate) {
+  const pathFromRoot = relative(root, candidate);
+  return pathFromRoot === '' || (!isAbsolute(pathFromRoot) && pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`));
+}
+
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-  const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
-  const candidate = normalize(join(root, relative));
-  if (!candidate.startsWith(root) || !existsSync(candidate) || !statSync(candidate).isFile()) {
+  const requestPath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  let candidate = normalize(join(root, requestPath));
+  if (isInsideRoot(candidate) && existsSync(candidate) && statSync(candidate).isDirectory()) {
+    candidate = normalize(join(candidate, 'index.html'));
+  }
+  if (!isInsideRoot(candidate) || !existsSync(candidate) || !statSync(candidate).isFile()) {
     response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     response.end('Not found');
     return;
