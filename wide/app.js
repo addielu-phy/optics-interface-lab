@@ -1,10 +1,11 @@
 import { traceLayerStack } from '../src/optics.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const DEFAULT_INDICES = Object.freeze([1.7, 1.5, 1.3, 1.6, 1.4, 1.2, 1.0]);
+const DEFAULT_INDICES = Object.freeze([1.7, 1.5, 1.3, 1.6, 1.4, 1.0, 1.0]);
 const PRESETS = Object.freeze({
   through: Object.freeze({ indices: DEFAULT_INDICES, angle: 30, side: 1 }),
   'deep-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 45, side: 1 }),
+  'middle-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 55, side: 1 }),
   'early-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 65, side: 1 }),
 });
 const INDEX_COLOR_RANGE = Object.freeze({ low: Object.freeze([237, 248, 245]), high: Object.freeze([23, 74, 82]) });

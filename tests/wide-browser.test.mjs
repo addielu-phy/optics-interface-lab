@@ -79,6 +79,8 @@ const report = { baseUrl, paletteContrast: assertPaletteContrast(), viewports: [
 
 async function assertLayout(page, viewport) {
   const geometry = await page.evaluate(() => {
+    const header = document.querySelector('.wide-header').getBoundingClientRect();
+    const question = document.getElementById('source-question').getBoundingClientRect();
     const controls = document.querySelector('.wide-controls').getBoundingClientRect();
     const stage = document.querySelector('.wide-stage').getBoundingClientRect();
     const scene = document.getElementById('wide-scene').getBoundingClientRect();
@@ -107,6 +109,17 @@ async function assertLayout(page, viewport) {
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
       ready: document.body.dataset.wideAppReady,
+      header: { top: header.top, bottom: header.bottom },
+      question: {
+        top: question.top,
+        bottom: question.bottom,
+        width: question.width,
+        title: document.getElementById('source-question-title').textContent.trim().replace(/\s+/g, ' '),
+        media: [...document.querySelectorAll('.question-media li')].map((item) => item.firstElementChild.textContent.trim().replace(/\s+/g, ' ')),
+        boundaries: [...document.querySelectorAll('.question-boundary b')].map((item) => item.textContent.trim()),
+        answerOpen: document.querySelector('.question-answer').open,
+      },
+      forbiddenQuestionLabels: ['例題9', '範例9'].filter((label) => document.body.innerText.includes(label)),
       controls: { left: controls.left, right: controls.right, top: controls.top, width: controls.width },
       stage: { left: stage.left, right: stage.right, top: stage.top, width: stage.width },
       scene: { width: scene.width, height: scene.height },
@@ -119,6 +132,14 @@ async function assertLayout(page, viewport) {
   assert.equal(geometry.clientWidth, viewport.width, `${viewport.name}: exact viewport width`);
   assert.equal(geometry.scrollWidth, geometry.clientWidth, `${viewport.name}: horizontal overflow ${JSON.stringify(geometry.overflowers)}`);
   assert.equal(geometry.ready, 'true', `${viewport.name}: app ready sentinel`);
+  assert.ok(geometry.question.top >= geometry.header.bottom, `${viewport.name}: source question must follow the header`);
+  assert.ok(geometry.question.bottom <= geometry.controls.top + 1, `${viewport.name}: source question must appear above the interactive workspace`);
+  assert.ok(geometry.question.width >= viewport.width - 42, `${viewport.name}: source question must use the available page width`);
+  assert.equal(geometry.question.title, '如右圖有六種介質、界面互相平行，如光線自 n1 介質射入，則可能發生全反射之界面有哪些？');
+  assert.deepEqual(geometry.question.media, ['n1 = 1.7', 'n2 = 1.5', 'n3 = 1.3', 'n4 = 1.6', 'n5 = 1.4', 'n6 = 1.0']);
+  assert.deepEqual(geometry.question.boundaries, ['（A）', '（B）', '（C）', '（D）', '（E）']);
+  assert.equal(geometry.question.answerOpen, false, `${viewport.name}: answer must be collapsed until requested`);
+  assert.deepEqual(geometry.forbiddenQuestionLabels, [], `${viewport.name}: textbook numbering must not be displayed`);
   assert.ok(geometry.controls.right <= geometry.stage.left + 1, `${viewport.name}: control and stage panes must be side by side`);
   assert.ok(Math.abs(geometry.controls.top - geometry.stage.top) <= 1, `${viewport.name}: panes must share top edge`);
   assert.ok(geometry.controls.width >= 250, `${viewport.name}: usable control pane width`);
@@ -153,6 +174,14 @@ async function runInteractions(page) {
   assert.equal(initial.events.length, 6);
   assert.equal(initial.termination, 'exited-bottom');
   assert.equal(initial.events.every((event) => event.reached), true);
+  assert.deepEqual(initial.indices, [1.7, 1.5, 1.3, 1.6, 1.4, 1, 1],
+    'the interactive defaults must reproduce the six-medium question, followed by an equal-index extension layer');
+  const questionAnswer = page.locator('.question-answer');
+  assert.equal(await questionAnswer.getAttribute('open'), null, 'question answer starts collapsed');
+  await questionAnswer.locator('summary').click();
+  assert.equal(await questionAnswer.getAttribute('open'), '', 'question answer opens on request');
+  assert.match((await questionAnswer.locator('p').textContent()).replace(/\s+/g, ' '), /A、B、E/);
+  await questionAnswer.locator('summary').click();
 
   const readSceneGeometry = () => page.evaluate(() => ({
     entry: {
@@ -193,7 +222,8 @@ async function runInteractions(page) {
   })));
   assert.equal(directionArrows.filter((arrow) => arrow.className.includes('incident')).length, 1);
   assert.equal(directionArrows.filter((arrow) => arrow.className.includes('transmitted')).length, 6);
-  assert.equal(directionArrows.filter((arrow) => arrow.className.includes('reflected')).length, 6);
+  assert.equal(directionArrows.filter((arrow) => arrow.className.includes('reflected')).length, 5,
+    'the five physical question interfaces have reflected paths; the equal-index extension has none');
   assert.equal(directionArrows.every((arrow) => /^url\(#wide-arrow-(incident|transmitted|reflected)\)$/.test(arrow.markerEnd)), true,
     'each rendered light-path direction segment must carry an arrowhead');
 
@@ -226,6 +256,15 @@ async function runInteractions(page) {
   }));
   assert.deepEqual(haloCounts, { halos: haloCounts.coloredRays, coloredRays: haloCounts.coloredRays },
     'every colored light path must have a contrast halo');
+  assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setPreset('through')), true);
+
+  assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setPreset('middle-tir')), true);
+  const middleTir = await page.evaluate(() => window.__WIDE_OPTICS_LAB__.snapshot);
+  assert.equal(middleTir.termination, 'total-internal-reflection');
+  assert.equal(middleTir.terminatedAt, 'B');
+  assert.equal(await page.locator('.event-card[data-interface="B"]').getAttribute('data-state'), 'tir');
+  assert.deepEqual(await readSceneGeometry(), fixedGeometry,
+    'the question preset for interface B must keep the entry point and interfaces fixed');
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setPreset('through')), true);
 
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setAngle(45)), true);
@@ -309,6 +348,7 @@ async function runInteractions(page) {
   assert.equal(hostile.descriptor.configurable, false);
 
   return {
+    sourceQuestion: 'pass', sourceQuestionAnswer: 'pass', questionPresetsABE: 'pass',
     multilayerPhysics: 'pass', refractiveIndexColorDepth: 'pass', dynamicLabelContrast: 'pass',
     fixedEntryPoint: 'pass', fixedInterfaceGeometry: 'pass',
     visiblePathArrows: 'pass', directRayDrag: 'pass', keyboard: 'pass',
