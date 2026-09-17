@@ -126,6 +126,24 @@ test('critical-angle grazing propagation does not falsely reach the next paralle
   assert.equal(trace.exitPower, 0);
 });
 
+test('deeper critical equality uses the conserved invariant without accumulated angle drift', () => {
+  const indices = [3, 2.142, 1.003, 1.002, 1.5, 1.5, 1.5];
+  const incidentDeg = Math.asin(indices[3] / indices[0]) * 180 / Math.PI;
+  const trace = traceLayerStack({ indices, incidentDeg });
+  const event = trace.events[2];
+
+  assert.equal(event.label, 'C');
+  assert.equal(event.reached, true);
+  assert.equal(event.atCritical, true);
+  assert.equal(event.totalInternalReflection, false);
+  closeTo(event.refractedDeg, 90, 1e-12);
+  assert.equal(trace.events[3].reached, false);
+  assert.equal(trace.events[3].blockedBy, 'C');
+  assert.equal(trace.termination, 'grazing');
+  assert.equal(trace.terminatedAt, 'C');
+  closeTo(trace.totalReflectedPower + trace.exitPower, 1, 1e-12);
+});
+
 test('six-interface trace validates exactly seven physical media and immutable output', () => {
   assert.throws(() => traceLayerStack({ indices: [1, 1.5], incidentDeg: 20 }), RangeError);
   assert.throws(() => traceLayerStack({ indices: Array(7).fill(1.5), incidentDeg: 75.1 }), RangeError);

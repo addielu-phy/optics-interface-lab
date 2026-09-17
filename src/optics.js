@@ -114,7 +114,6 @@ export function traceLayerStack(state) {
   const incidentDeg = requireLayerAngle(state.incidentDeg);
   const invariant = indices[0] * Math.sin(incidentDeg * DEG);
   const events = [];
-  let currentAngle = incidentDeg;
   let incomingPower = 1;
   let blockedBy = null;
   let termination = 'exited-bottom';
@@ -148,7 +147,17 @@ export function traceLayerStack(state) {
       continue;
     }
 
-    const model = solveOptics({ n1, n2, incidentDeg: currentAngle });
+    const invariantTolerance = 64 * Number.EPSILON
+      * Math.max(1, Math.abs(invariant), Math.abs(n1), Math.abs(n2));
+    const isInvariantCritical = n1 > n2 && Math.abs(invariant - n2) <= invariantTolerance;
+    const propagatedAngle = index === 0
+      ? incidentDeg
+      : Math.asin(Math.max(-1, Math.min(1, invariant / n1))) / DEG;
+    const model = solveOptics({
+      n1,
+      n2,
+      incidentDeg: isInvariantCritical ? Math.asin(n2 / n1) / DEG : propagatedAngle,
+    });
     const reflectedPower = incomingPower * model.reflectance;
     const transmittedPower = incomingPower * model.transmittance;
     events.push(Object.freeze({
@@ -172,7 +181,6 @@ export function traceLayerStack(state) {
       blockedBy = label;
       incomingPower = 0;
     } else {
-      currentAngle = model.refractedDeg;
       incomingPower = transmittedPower;
     }
   }
