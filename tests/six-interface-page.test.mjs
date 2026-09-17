@@ -131,6 +131,10 @@ try {
       const deepTir = await page.evaluate(() => window.__SIX_INTERFACE_LAB__.snapshot);
       assert.equal(deepTir.termination, 'total-internal-reflection');
       assert.equal(deepTir.terminatedAt, 'E');
+      const tirAccessibility = await page.evaluate(async () => globalThis.axe.run(document, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      }));
+      assert.deepEqual(tirAccessibility.violations, [], 'deep-TIR state must retain WCAG A/AA contrast');
 
       assert.equal(await page.evaluate(() => window.__SIX_INTERFACE_LAB__.setIndices(Array(7).fill(1.5))), true);
       assert.equal(await page.evaluate(() => window.__SIX_INTERFACE_LAB__.setAngle(60)), true);
