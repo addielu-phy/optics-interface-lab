@@ -282,11 +282,15 @@ a { color: inherit; }
 .ray-label { font-size: 14px; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; stroke-linejoin: round; }
 .angle-label { font-size: 16px; fill: #765000; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; }
 .drag-label { font-size: 14px; fill: #765000; paint-order: stroke; stroke: #fffdf8; stroke-width: 5px; }
-.primary-ray, .reflection-ray, .grazing-ray, .angle-arc { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.primary-ray { stroke: var(--blue); stroke-width: 5.5; marker-end: url(#wide-arrow-transmitted); }
-.primary-ray.incident { stroke: #8a6100; marker-end: url(#wide-arrow-incident); }
-.reflection-ray { stroke: var(--coral); stroke-width: 4.5; marker-end: url(#wide-arrow-reflected); }
-.grazing-ray { stroke: var(--blue); stroke-width: 4.5; stroke-dasharray: 9 7; marker-end: url(#wide-arrow-transmitted); }
+.primary-ray, .reflection-ray, .grazing-ray, .direction-arrow, .angle-arc { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.primary-ray { stroke: var(--blue); stroke-width: 5.5; }
+.primary-ray.incident { stroke: #8a6100; }
+.reflection-ray { stroke: var(--coral); stroke-width: 4.5; }
+.grazing-ray { stroke: var(--blue); stroke-width: 4.5; stroke-dasharray: 9 7; }
+.direction-arrow { pointer-events: none; }
+.direction-arrow.incident { stroke: #8a6100; stroke-width: 5.5; }
+.direction-arrow.transmitted { stroke: var(--blue); stroke-width: 5.5; }
+.direction-arrow.reflected { stroke: var(--coral); stroke-width: 4.5; }
 .ray-glow { fill: none; stroke: #f4cb55; stroke-width: 14; opacity: .12; filter: url(#wide-ray-glow); }
 .impact { fill: #fffdf8; stroke: #173f44; stroke-width: 2.5; }
 .impact.tir { fill: var(--yellow); stroke: #8a6100; stroke-width: 4; }

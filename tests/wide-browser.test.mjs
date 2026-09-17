@@ -24,7 +24,7 @@ function contrastRatio(colorA, colorB) {
 }
 
 function assertPaletteContrast() {
-  const layerFills = ['#c9e7e4', '#d8ece8', '#e6edcf', '#f4e2ad', '#f4cea9', '#efb4a9', '#d8cbe6'];
+  const layerFills = ['#c8e7e5', '#d9ece8', '#eef2db', '#f5e7bd', '#f6d9bc', '#f3c7bb', '#dfd3ea'];
   const textPairs = [
     ['#12363b', '#f2eee5'], ['#12363b', '#fffdf8'],
     ['#486268', '#f2eee5'], ['#486268', '#fffdf8'],
@@ -159,6 +159,30 @@ async function runInteractions(page) {
   assert.equal(initial.termination, 'exited-bottom');
   assert.equal(initial.events.every((event) => event.reached), true);
 
+  const readSceneGeometry = () => page.evaluate(() => ({
+    entry: {
+      x: Number(document.getElementById('wide-impact-a').getAttribute('cx')),
+      y: Number(document.getElementById('wide-impact-a').getAttribute('cy')),
+    },
+    layers: [...document.querySelectorAll('#wide-backgrounds .layer-fill')].map((rect) => ({
+      x: Number(rect.getAttribute('x')),
+      y: Number(rect.getAttribute('y')),
+      width: Number(rect.getAttribute('width')),
+      height: Number(rect.getAttribute('height')),
+    })),
+    interfaces: [...document.querySelectorAll('#wide-backgrounds .interface-line')].map((line) => ({
+      x1: Number(line.getAttribute('x1')),
+      y1: Number(line.getAttribute('y1')),
+      x2: Number(line.getAttribute('x2')),
+      y2: Number(line.getAttribute('y2')),
+    })),
+  }));
+  const fixedGeometry = await readSceneGeometry();
+  assert.deepEqual(fixedGeometry.entry, { x: 430, y: 144 }, 'interface A entry point must use the fixed pivot');
+  assert.equal(fixedGeometry.layers.length, 7);
+  assert.equal(fixedGeometry.layers.every((layer) => layer.width === 960 && layer.height === 64), true,
+    'all media layers must keep fixed dimensions');
+
   const markerShape = await page.evaluate(() => [...document.querySelectorAll('#wide-scene marker')].map((marker) => ({
     id: marker.id,
     width: Number(marker.getAttribute('markerWidth')),
@@ -168,6 +192,15 @@ async function runInteractions(page) {
   assert.equal(markerShape.length, 3);
   assert.equal(markerShape.every((marker) => marker.width <= 10 && marker.height <= 10 && marker.units === 'userSpaceOnUse'), true,
     `arrowheads must stay visually proportional: ${JSON.stringify(markerShape)}`);
+  const directionArrows = await page.locator('#wide-rays .direction-arrow').evaluateAll((nodes) => nodes.map((node) => ({
+    className: node.getAttribute('class'),
+    markerEnd: node.getAttribute('marker-end'),
+  })));
+  assert.equal(directionArrows.filter((arrow) => arrow.className.includes('incident')).length, 1);
+  assert.equal(directionArrows.filter((arrow) => arrow.className.includes('transmitted')).length, 6);
+  assert.equal(directionArrows.filter((arrow) => arrow.className.includes('reflected')).length, 6);
+  assert.equal(directionArrows.every((arrow) => /^url\(#wide-arrow-(incident|transmitted|reflected)\)$/.test(arrow.markerEnd)), true,
+    'each rendered light-path direction segment must carry an arrowhead');
 
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setAngle(45)), true);
   const deepTir = await page.evaluate(() => window.__WIDE_OPTICS_LAB__.snapshot);
@@ -176,11 +209,15 @@ async function runInteractions(page) {
   assert.equal(await page.locator('.event-card[data-interface="E"]').getAttribute('data-state'), 'tir');
   assert.equal(await page.locator('.event-card[data-interface="F"]').getAttribute('data-state'), 'blocked');
   assert.match(await page.locator('#stage-title').textContent(), /界面 E.*全反射/);
+  assert.deepEqual(await readSceneGeometry(), fixedGeometry,
+    'changing to 45 degrees must not move the entry point or resize the interfaces');
   await page.screenshot({ path: resolve(artifactDir, 'laptop-1440x900-tir-interface-e.png'), fullPage: true });
 
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setAngle(65)), true);
   const earlyTir = await page.evaluate(() => window.__WIDE_OPTICS_LAB__.snapshot);
   assert.equal(earlyTir.terminatedAt, 'A');
+  assert.deepEqual(await readSceneGeometry(), fixedGeometry,
+    'changing to 65 degrees must not move the entry point or resize the interfaces');
 
   assert.equal(await page.evaluate(() => window.__WIDE_OPTICS_LAB__.setAngle(30)), true);
   const beforeDrag = await page.evaluate(() => window.__WIDE_OPTICS_LAB__.state.angle);
@@ -245,7 +282,11 @@ async function runInteractions(page) {
   assert.equal(hostile.descriptor.writable, false);
   assert.equal(hostile.descriptor.configurable, false);
 
-  return { multilayerPhysics: 'pass', directRayDrag: 'pass', keyboard: 'pass', proportionalArrowheads: 'pass', invalidStateRetention: 'pass' };
+  return {
+    multilayerPhysics: 'pass', fixedEntryPoint: 'pass', fixedInterfaceGeometry: 'pass',
+    visiblePathArrows: 'pass', directRayDrag: 'pass', keyboard: 'pass',
+    proportionalArrowheads: 'pass', invalidStateRetention: 'pass',
+  };
 }
 
 async function runTouchInteraction(page) {

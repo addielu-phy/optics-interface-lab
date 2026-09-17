@@ -8,6 +8,7 @@ const PRESETS = Object.freeze({
   'early-tir': Object.freeze({ indices: DEFAULT_INDICES, angle: 65, side: 1 }),
 });
 const LAYER_COLORS = Object.freeze(['#c8e7e5', '#d9ece8', '#eef2db', '#f5e7bd', '#f6d9bc', '#f3c7bb', '#dfd3ea']);
+const SCENE = Object.freeze({ width: 960, layerTop: 80, layerHeight: 64, entryX: 430 });
 const byId = (id) => document.getElementById(id);
 const dom = Object.freeze({
   angle: byId('wide-angle-range'),
@@ -55,6 +56,13 @@ function pathData(from, to) {
   return `M ${fixed(from.x, 2)} ${fixed(from.y, 2)} L ${fixed(to.x, 2)} ${fixed(to.y, 2)}`;
 }
 
+function pointAlong(from, to, fraction) {
+  return {
+    x: from.x + (to.x - from.x) * fraction,
+    y: from.y + (to.y - from.y) * fraction,
+  };
+}
+
 function polarPoint(cx, cy, radius, degrees) {
   const radians = degrees * Math.PI / 180;
   return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
@@ -70,7 +78,6 @@ function arcPath(cx, cy, radius, startDeg, endDeg) {
 function geometryFor(trace, side) {
   const sourceUnit = { x: 0, y: 0.16 };
   const impacts = [];
-  const samples = [sourceUnit.x];
   let x = sourceUnit.x;
   let y = sourceUnit.y;
   let angle = trace.incidentDeg;
@@ -82,9 +89,6 @@ function geometryFor(trace, side) {
     x += side * Math.tan(angle * Math.PI / 180) * (targetY - y);
     y = targetY;
     impacts.push({ x, y, event });
-    samples.push(x);
-    const branchX = x + side * Math.tan(event.incidentDeg * Math.PI / 180) * 0.58;
-    samples.push(branchX);
     if (event.totalInternalReflection || event.atCritical) break;
     angle = event.refractedDeg;
   }
@@ -94,25 +98,38 @@ function geometryFor(trace, side) {
     const targetY = 7;
     x += side * Math.tan(angle * Math.PI / 180) * (targetY - y);
     exitUnit = { x, y: targetY };
-    samples.push(x);
   }
 
-  const minX = Math.min(...samples);
-  const maxX = Math.max(...samples);
-  const span = Math.max(0.1, maxX - minX);
-  const layerHeight = Math.max(26, Math.min(76, 550 / 7, 850 / (span + 1.3)));
-  const topY = (640 - 7 * layerHeight) / 2;
-  const originX = 480 - ((minX + maxX) / 2) * layerHeight;
-  const point = (unit) => ({ x: originX + unit.x * layerHeight, y: topY + unit.y * layerHeight });
+  const firstImpact = impacts[0];
+  if (!firstImpact) throw new Error('At least one reached interface is required');
+  const originX = SCENE.entryX - firstImpact.x * SCENE.layerHeight;
+  const point = (unit) => ({
+    x: originX + unit.x * SCENE.layerHeight,
+    y: SCENE.layerTop + unit.y * SCENE.layerHeight,
+  });
 
   return Object.freeze({
-    layerHeight,
-    topY,
-    bottomY: topY + 7 * layerHeight,
+    layerHeight: SCENE.layerHeight,
+    topY: SCENE.layerTop,
+    bottomY: SCENE.layerTop + 7 * SCENE.layerHeight,
+    entry: Object.freeze({ x: SCENE.entryX, y: SCENE.layerTop + SCENE.layerHeight }),
     source: point(sourceUnit),
     impacts: Object.freeze(impacts.map((impact) => Object.freeze({ ...point(impact), event: impact.event }))),
     exit: exitUnit ? point(exitUnit) : null,
   });
+}
+
+function appendDirectionArrow(from, to, kind, opacity = 1) {
+  const marker = kind === 'incident'
+    ? 'wide-arrow-incident'
+    : kind === 'reflected' ? 'wide-arrow-reflected' : 'wide-arrow-transmitted';
+  dom.rays.append(svgNode('path', {
+    class: `direction-arrow ${kind}`,
+    d: pathData(pointAlong(from, to, 0.38), pointAlong(from, to, 0.62)),
+    opacity,
+    'marker-end': `url(#${marker})`,
+    'aria-hidden': 'true',
+  }));
 }
 
 function renderBackgrounds(trace, geometry) {
@@ -123,7 +140,7 @@ function renderBackgrounds(trace, geometry) {
   trace.indices.forEach((n, index) => {
     const y = geometry.topY + index * geometry.layerHeight;
     dom.backgrounds.append(svgNode('rect', {
-      class: 'layer-fill', x: 0, y: fixed(y, 2), width: 960,
+      class: 'layer-fill', x: 0, y: fixed(y, 2), width: SCENE.width,
       height: fixed(geometry.layerHeight, 2), fill: LAYER_COLORS[index],
     }));
     if (showLabels) {
@@ -137,7 +154,7 @@ function renderBackgrounds(trace, geometry) {
     const y = geometry.topY + (index + 1) * geometry.layerHeight;
     dom.backgrounds.append(svgNode('line', {
       class: `interface-line${event.reached ? '' : ' blocked'}`,
-      x1: 0, y1: fixed(y, 2), x2: 960, y2: fixed(y, 2),
+      x1: 0, y1: fixed(y, 2), x2: SCENE.width, y2: fixed(y, 2),
     }));
     if (showLabels) {
       dom.annotations.append(svgNode('text', {
@@ -184,12 +201,15 @@ function renderRays(trace, geometry, nextState) {
       dom.rays.append(svgNode('path', { class: 'ray-glow', d }));
       dom.incidentHit.setAttribute('d', d);
     }
+    const opacity = fixed(Math.max(.28, Math.sqrt(Math.max(0, incomingPower))), 3);
+    const kind = index === 1 ? 'incident' : 'transmitted';
     dom.rays.append(svgNode('path', {
       id: index === 1 ? 'wide-incident-ray' : '',
       class: `primary-ray${index === 1 ? ' incident' : ''}`,
       d,
-      opacity: fixed(Math.max(.28, Math.sqrt(Math.max(0, incomingPower))), 3),
+      opacity,
     }));
+    appendDirectionArrow(from, to, kind, opacity);
   }
 
   geometry.impacts.forEach((impact) => {
@@ -197,22 +217,28 @@ function renderRays(trace, geometry, nextState) {
     const branchDy = geometry.layerHeight * 0.58;
     const branchDx = nextState.side * Math.tan(event.incidentDeg * Math.PI / 180) * branchDy;
     if (event.reflectedPower > 1e-10) {
+      const reflectedEnd = { x: impact.x + branchDx, y: impact.y - branchDy };
+      const opacity = fixed(Math.max(.28, Math.sqrt(event.reflectedPower)), 3);
       dom.rays.append(svgNode('path', {
         class: 'reflection-ray',
-        d: pathData(impact, { x: impact.x + branchDx, y: impact.y - branchDy }),
-        opacity: fixed(Math.max(.28, Math.sqrt(event.reflectedPower)), 3),
+        d: pathData(impact, reflectedEnd),
+        opacity,
       }));
+      appendDirectionArrow(impact, reflectedEnd, 'reflected', opacity);
     }
     if (event.atCritical) {
+      const grazingEnd = {
+        x: Math.max(36, Math.min(924, impact.x + nextState.side * Math.max(76, geometry.layerHeight * 1.25))),
+        y: impact.y,
+      };
       dom.rays.append(svgNode('path', {
         class: 'grazing-ray',
-        d: pathData(impact, {
-          x: Math.max(36, Math.min(924, impact.x + nextState.side * Math.max(76, geometry.layerHeight * 1.25))),
-          y: impact.y,
-        }),
+        d: pathData(impact, grazingEnd),
       }));
+      appendDirectionArrow(impact, grazingEnd, 'transmitted');
     }
     dom.rays.append(svgNode('circle', {
+      id: `wide-impact-${event.label.toLowerCase()}`,
       class: `impact${event.totalInternalReflection ? ' tir' : ''}`,
       cx: fixed(impact.x, 2), cy: fixed(impact.y, 2), r: event.totalInternalReflection ? 7 : 4.5,
     }));
